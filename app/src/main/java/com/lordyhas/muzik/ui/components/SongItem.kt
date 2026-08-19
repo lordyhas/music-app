@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -150,7 +152,7 @@ fun SongItem(
             onClick = { /* doSomething */ },
         ) {
             Icon(
-                Icons.Filled.Equalizer,
+                Icons.Filled.MoreVert,
                 contentDescription = "Menu",
                 modifier = Modifier.size(24.dp)
             )
