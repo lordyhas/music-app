@@ -2,7 +2,6 @@ package com.lordyhas.muzik.data.repository
 
 import android.content.ContentUris
 import android.content.Context
-import android.media.MediaMetadataRetriever
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Environment
@@ -17,9 +16,12 @@ class MusicRepository(private val context: Context) {
     private val supportedExtensions = setOf("mp3", "m4a", "wav", "flac", "ogg", "aac", "opus")
 
     suspend fun getLocalSongs(): List<Song> = withContext(Dispatchers.IO) {
+        // Trigger media scan on directories so Android indexes any newly added files
+        scanAndIndexStorage()
+
         val songsList = mutableListOf<Song>()
 
-        // 1. Query Android MediaStore
+        // Query Android MediaStore (single source of truth for all audio on the device)
         val uri: Uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -31,7 +33,7 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.DISPLAY_NAME
         )
 
-        val selection = "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.MIME_TYPE} LIKE 'audio/%' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.mp3' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.m4a' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.wav' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.flac' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.ogg' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.aac') AND (${MediaStore.Audio.Media.IS_RINGTONE} == 0 OR ${MediaStore.Audio.Media.IS_RINGTONE} IS NULL) AND (${MediaStore.Audio.Media.IS_NOTIFICATION} == 0 OR ${MediaStore.Audio.Media.IS_NOTIFICATION} IS NULL) AND (${MediaStore.Audio.Media.IS_ALARM} == 0 OR ${MediaStore.Audio.Media.IS_ALARM} IS NULL)"
+        val selection = "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.MIME_TYPE} LIKE 'audio/%' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.mp3' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.m4a' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.wav' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.flac' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.ogg' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.aac' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.opus') AND (${MediaStore.Audio.Media.IS_RINGTONE} == 0 OR ${MediaStore.Audio.Media.IS_RINGTONE} IS NULL) AND (${MediaStore.Audio.Media.IS_NOTIFICATION} == 0 OR ${MediaStore.Audio.Media.IS_NOTIFICATION} IS NULL) AND (${MediaStore.Audio.Media.IS_ALARM} == 0 OR ${MediaStore.Audio.Media.IS_ALARM} IS NULL)"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
 
         try {
@@ -80,42 +82,27 @@ class MusicRepository(private val context: Context) {
                         ContentUris.withAppendedId(albumArtUriBase, albumId)
                     } else null
 
-                    songsList.add(
-                        Song(
-                            id = id,
-                            title = cleanTitle,
-                            artist = artist,
-                            album = album,
-                            albumId = albumId,
-                            duration = if (duration < 0) 0L else duration,
-                            contentUri = contentUri,
-                            albumArtUri = albumArtUri
-                        )
+                    val song = Song(
+                        id = id,
+                        title = cleanTitle,
+                        artist = artist,
+                        album = album,
+                        albumId = albumId,
+                        duration = if (duration < 0) 0L else duration,
+                        contentUri = contentUri,
+                        albumArtUri = albumArtUri
                     )
+                    songsList.add(song)
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
 
-        // 2. Direct storage scan fallback (specifically helpful on emulators before MediaScanner indexes)
-        val scannedFiles = scanStorageDirectories()
-        if (scannedFiles.isNotEmpty()) {
-            val existingTitles = songsList.map { it.title.lowercase().trim() }.toSet()
-            for ((index, file) in scannedFiles.withIndex()) {
-                val fileNameNoExt = file.nameWithoutExtension.lowercase().trim()
-                if (!existingTitles.contains(fileNameNoExt)) {
-                    val directSong = parseSongFromFile(file, index)
-                    songsList.add(directSong)
-                }
-            }
-        }
-
-        songsList.distinctBy { it.contentUri.toString() }.sortedBy { it.title.lowercase() }
+        songsList.sortedBy { it.title.lowercase() }
     }
 
-    private fun scanStorageDirectories(): List<File> {
-        val filesFound = mutableListOf<File>()
+    private fun scanAndIndexStorage() {
         try {
             val directories = listOf(
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
@@ -125,6 +112,7 @@ class MusicRepository(private val context: Context) {
                 Environment.getExternalStorageDirectory()
             )
 
+            val filesFound = mutableListOf<File>()
             for (dir in directories) {
                 if (dir != null && dir.exists() && dir.isDirectory) {
                     collectAudioFiles(dir, filesFound, maxDepth = 4)
@@ -138,7 +126,6 @@ class MusicRepository(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        return filesFound
     }
 
     private fun collectAudioFiles(dir: File, result: MutableList<File>, maxDepth: Int) {
@@ -152,48 +139,5 @@ class MusicRepository(private val context: Context) {
             }
         }
     }
-
-    private fun parseSongFromFile(file: File, index: Int): Song {
-        val retriever = MediaMetadataRetriever()
-        var title = file.nameWithoutExtension
-        var artist = "Artiste inconnu"
-        var album = "Album inconnu"
-        var duration = 0L
-
-        try {
-            retriever.setDataSource(file.absolutePath)
-            val metaTitle = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-            val metaArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-            val metaAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
-            val metaDur = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-
-            if (!metaTitle.isNullOrBlank()) title = metaTitle
-            if (!metaArtist.isNullOrBlank()) artist = metaArtist
-            if (!metaAlbum.isNullOrBlank()) album = metaAlbum
-            duration = metaDur?.toLongOrNull() ?: 0L
-        } catch (e: Exception) {
-            e.printStackTrace()
-        } finally {
-            try {
-                retriever.release()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-
-        val uniqueId = (Math.abs(file.absolutePath.hashCode().toLong()) shl 8) + index + 10_000_000L
-
-        return Song(
-            id = uniqueId,
-            title = title,
-            artist = artist,
-            album = album,
-            albumId = 0L,
-            duration = duration,
-            contentUri = Uri.fromFile(file),
-            albumArtUri = null
-        )
-    }
 }
-
 
