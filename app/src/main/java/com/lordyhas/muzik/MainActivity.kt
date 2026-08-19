@@ -15,7 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
-import com.lordyhas.muzik.ui.screens.HomeScreen
+import com.lordyhas.muzik.ui.screens.MainAppScreen
 import com.lordyhas.muzik.ui.theme.BackgroundDark
 import com.lordyhas.muzik.ui.theme.MuzikTheme
 import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
@@ -58,7 +58,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = BackgroundDark
                 ) {
-                    HomeScreen(
+                    MainAppScreen(
                         viewModel = viewModel,
                         onRequestPermissions = {
                             permissionLauncher.launch(permissionsToRequest)

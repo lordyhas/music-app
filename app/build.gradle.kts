@@ -60,7 +60,6 @@ dependencies {
 
     // Coil
     implementation(libs.coil.compose)
-    implementation(libs.androidx.media3.common.ktx)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

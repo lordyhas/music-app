@@ -1,11 +1,7 @@
 package com.lordyhas.muzik.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,23 +15,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,301 +41,553 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
-import com.lordyhas.muzik.ui.components.MiniPlayer
-import com.lordyhas.muzik.ui.components.NowPlayingScreen
-import com.lordyhas.muzik.ui.components.PermissionRequestView
-import com.lordyhas.muzik.ui.components.SongItem
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.lordyhas.muzik.data.model.Song
+import com.lordyhas.muzik.ui.components.AlbumCard
+import com.lordyhas.muzik.ui.components.ArtistCard
+import com.lordyhas.muzik.ui.components.SongListSheet
 import com.lordyhas.muzik.ui.theme.AccentCyan
 import com.lordyhas.muzik.ui.theme.AccentPrimary
 import com.lordyhas.muzik.ui.theme.AccentSecondary
 import com.lordyhas.muzik.ui.theme.BackgroundDark
 import com.lordyhas.muzik.ui.theme.SurfaceCard
-import com.lordyhas.muzik.ui.theme.SurfaceDark
 import com.lordyhas.muzik.ui.theme.SurfaceElevated
 import com.lordyhas.muzik.ui.theme.TextMuted
 import com.lordyhas.muzik.ui.theme.TextPrimary
 import com.lordyhas.muzik.ui.theme.TextSecondary
 import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
+import java.util.Calendar
 
+@OptIn(ExperimentalMaterial3Api::class)
 @UnstableApi
 @Composable
 fun HomeScreen(
     viewModel: MusicViewModel,
-    onRequestPermissions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isPermissionGranted by viewModel.isPermissionGranted.collectAsState()
-    val songs by viewModel.filteredSongs.collectAsState()
-    val totalSongs by viewModel.songs.collectAsState()
+    val songs by viewModel.songs.collectAsState()
+    val recentSongs by viewModel.recentlyPlayedSongs.collectAsState()
+    val recentAlbums by viewModel.recentlyPlayedAlbums.collectAsState()
+    val recentArtists by viewModel.recentlyPlayedArtists.collectAsState()
+    val selectedAlbum by viewModel.selectedAlbum.collectAsState()
+    val selectedArtist by viewModel.selectedArtist.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
-    val currentPosition by viewModel.currentPosition.collectAsState()
-    val duration by viewModel.duration.collectAsState()
-    val isShuffle by viewModel.isShuffle.collectAsState()
-    val repeatMode by viewModel.repeatMode.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val showNowPlaying by viewModel.showNowPlaying.collectAsState()
 
-    if (!isPermissionGranted) {
-        PermissionRequestView(onRequestPermission = onRequestPermissions)
-        return
-    }
+    val greeting = rememberGreeting()
+    val heroSong = recentSongs.firstOrNull() ?: songs.firstOrNull()
 
-    Box(modifier = modifier.fillMaxSize().background(BackgroundDark)) {
-        Scaffold(
-            containerColor = BackgroundDark,
-            bottomBar = {
-                if (currentSong != null) {
-                    MiniPlayer(
-                        song = currentSong,
-                        isPlaying = isPlaying,
-                        currentPosition = currentPosition,
-                        duration = duration,
-                        onTogglePlayPause = { viewModel.togglePlayPause() },
-                        onSkipNext = { viewModel.skipNext() },
-                        onClick = { viewModel.setShowNowPlaying(true) }
-                    )
-                }
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(BackgroundDark)
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 90.dp)
+    ) {
+        // Top Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp
+                    ),
+                    color = TextPrimary
+                )
+                Text(
+                    text = "${songs.size} titres dans votre bibliothèque",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary
+                )
             }
-        ) { paddingValues ->
-            Column(
+
+            IconButton(
+                onClick = { viewModel.loadSongs() },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(SurfaceCard)
             ) {
-                // App Header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(AccentPrimary, AccentSecondary)
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LibraryMusic,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Actualiser",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = AccentPrimary)
+            }
+        } else if (songs.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Aucune musique trouvée sur cet appareil.\nAjoutez des fichiers audio ou rafraîchissez.",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        } else {
+            // Hero Card (Reprendre ou Lecture Aléatoire)
+            if (heroSong != null) {
+                HeroCard(
+                    song = heroSong,
+                    isRecent = recentSongs.isNotEmpty(),
+                    onPlay = { viewModel.playSong(heroSong) },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
 
-                        Column {
-                            Text(
-                                text = "Muzik",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 22.sp
-                                ),
-                                color = TextPrimary
-                            )
-                            Text(
-                                text = "${totalSongs.size} pistes locales",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = TextSecondary
-                            )
-                        }
-                    }
+            Spacer(modifier = Modifier.height(16.dp))
 
-                    Row {
-                        // Quick Shuffle Button
-                        if (totalSongs.isNotEmpty()) {
-                            IconButton(
-                                onClick = {
-                                    val randomSong = totalSongs.randomOrNull()
-                                    randomSong?.let { viewModel.playSong(it) }
-                                },
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(SurfaceCard)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Shuffle,
-                                    contentDescription = "Lecture Aléatoire",
-                                    tint = AccentPrimary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-
-                        // Refresh Button
-                        IconButton(
-                            onClick = { viewModel.loadSongs() },
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(SurfaceCard)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Actualiser",
-                                tint = TextSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Search Bar
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.updateSearchQuery(it) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    placeholder = {
-                        Text(
-                            text = "Rechercher titre, artiste, album...",
-                            color = TextMuted,
-                            fontSize = 14.sp
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Recherche",
-                            tint = TextMuted
-                        )
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Effacer",
-                                    tint = TextSecondary
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = SurfaceCard,
-                        unfocusedContainerColor = SurfaceCard,
-                        disabledContainerColor = SurfaceCard,
-                        focusedBorderColor = AccentPrimary,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        cursorColor = AccentPrimary
-                    )
+            // Quick Mixes Row
+            SectionHeader(title = "Mix Rapides")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                QuickActionCard(
+                    title = "Aléatoire Total",
+                    subtitle = "Toute la musique",
+                    icon = Icons.Default.Shuffle,
+                    gradient = listOf(AccentPrimary, Color(0xFFE11D48)),
+                    onClick = { viewModel.playRandom() },
+                    modifier = Modifier.weight(1f)
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Content / List
-                if (isLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = AccentPrimary)
-                    }
-                } else if (songs.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LibraryMusic,
-                                contentDescription = null,
-                                tint = TextMuted,
-                                modifier = Modifier.size(64.dp)
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Text(
-                                text = if (searchQuery.isNotBlank()) "Aucun résultat trouvé" else "Aucune musique sur l'appareil",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.SemiBold
-                                ),
-                                color = TextPrimary,
-                                textAlign = TextAlign.Center
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = if (searchQuery.isNotBlank()) "Essayez un autre mot-clé de recherche." else "Ajoutez des fichiers MP3 ou audio sur votre téléphone.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextSecondary,
-                                textAlign = TextAlign.Center
-                            )
+                QuickActionCard(
+                    title = "Découverte",
+                    subtitle = "10 morceaux au hasard",
+                    icon = Icons.Default.AutoAwesome,
+                    gradient = listOf(AccentSecondary, AccentCyan),
+                    onClick = {
+                        val sample = songs.shuffled().take(10)
+                        if (sample.isNotEmpty()) {
+                            viewModel.playSong(sample.first(), sample)
                         }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Recently Played Tracks Carousel
+            if (recentSongs.isNotEmpty()) {
+                SectionHeader(title = "Récemment Écoutés")
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(vertical = 6.dp)
+                ) {
+                    items(recentSongs.take(10), key = { it.contentUri.toString() }) { song ->
+                        RecentSongCard(
+                            song = song,
+                            onClick = { viewModel.playSong(song) }
+                        )
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(top = 4.dp, bottom = 20.dp)
-                    ) {
-                        items(songs, key = { it.contentUri.toString() }) { song ->
-                            val isSelected = currentSong?.id == song.id
-                            SongItem(
-                                song = song,
-                                isSelected = isSelected,
-                                isPlaying = isPlaying && isSelected,
-                                onClick = { viewModel.playSong(song) }
-                            )
-                        }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Albums Carousel
+            if (recentAlbums.isNotEmpty()) {
+                SectionHeader(title = "Albums")
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(vertical = 6.dp)
+                ) {
+                    items(recentAlbums, key = { it.title + it.id }) { album ->
+                        AlbumCard(
+                            album = album,
+                            onClick = { viewModel.selectAlbum(album) },
+                            modifier = Modifier.width(140.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Artists Carousel
+            if (recentArtists.isNotEmpty()) {
+                SectionHeader(title = "Artistes")
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(vertical = 6.dp)
+                ) {
+                    items(recentArtists, key = { it.name }) { artist ->
+                        ArtistCard(
+                            artist = artist,
+                            onClick = { viewModel.selectArtist(artist) }
+                        )
                     }
                 }
             }
         }
+    }
 
-        // Fullscreen Now Playing Animation Sheet
-        AnimatedVisibility(
-            visible = showNowPlaying,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+    // Modal Sheet showing album songs
+    selectedAlbum?.let { album ->
+        SongListSheet(
+            title = album.title,
+            subtitle = "${album.artist} • ${album.songCount} titres",
+            artworkUri = album.albumArtUri,
+            songs = album.songs,
+            currentSongId = currentSong?.id,
+            isPlaying = isPlaying,
+            onSongClick = { song -> viewModel.playAlbum(album, song) },
+            onPlayAll = { viewModel.playAlbum(album) },
+            onShuffleAll = {
+                val shuffled = album.songs.shuffled()
+                if (shuffled.isNotEmpty()) {
+                    viewModel.playSong(shuffled.first(), shuffled)
+                }
+            },
+            onDismiss = { viewModel.selectAlbum(null) }
+        )
+    }
+
+    // Modal Sheet showing artist songs
+    selectedArtist?.let { artist ->
+        SongListSheet(
+            title = artist.name,
+            subtitle = "${artist.songCount} titres • ${artist.albumCount} album${if (artist.albumCount > 1) "s" else ""}",
+            artworkUri = artist.artworkUri,
+            songs = artist.songs,
+            currentSongId = currentSong?.id,
+            isPlaying = isPlaying,
+            onSongClick = { song -> viewModel.playArtist(artist, song) },
+            onPlayAll = { viewModel.playArtist(artist) },
+            onShuffleAll = {
+                val shuffled = artist.songs.shuffled()
+                if (shuffled.isNotEmpty()) {
+                    viewModel.playSong(shuffled.first(), shuffled)
+                }
+            },
+            onDismiss = { viewModel.selectArtist(null) }
+        )
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp
+        ),
+        color = TextPrimary,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+    )
+}
+
+@Composable
+private fun HeroCard(
+    song: Song,
+    isRecent: Boolean,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(16.dp, RoundedCornerShape(20.dp), spotColor = AccentPrimary.copy(alpha = 0.35f))
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onPlay),
+        color = SurfaceCard
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color(0xFF2B1D38),
+                            Color(0xFF1E172E),
+                            SurfaceCard
+                        )
+                    )
+                )
+                .padding(16.dp)
         ) {
-            NowPlayingScreen(
-                song = currentSong,
-                isPlaying = isPlaying,
-                currentPosition = currentPosition,
-                duration = duration,
-                isShuffle = isShuffle,
-                repeatMode = repeatMode,
-                onTogglePlayPause = { viewModel.togglePlayPause() },
-                onSeekTo = { viewModel.seekTo(it) },
-                onSkipNext = { viewModel.skipNext() },
-                onSkipPrevious = { viewModel.skipPrevious() },
-                onToggleShuffle = { viewModel.toggleShuffle() },
-                onToggleRepeat = { viewModel.toggleRepeat() },
-                onDismiss = { viewModel.setShowNowPlaying(false) }
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Album Art
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(AccentPrimary, AccentSecondary)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (song.albumArtUri != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(song.albumArtUri)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = song.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.matchParentSize()
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isRecent) "REPRENDRE LA LECTURE" else "TITRE À DÉCOUVRIR",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp
+                        ),
+                        color = AccentPrimary
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = song.title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        ),
+                        color = TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Text(
+                        text = song.artist,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Play Button
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .shadow(8.dp, CircleShape, spotColor = AccentPrimary)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(AccentPrimary, AccentSecondary)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Lire",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun RecentSongCard(
+    song: Song,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(120.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .background(SurfaceCard)
+            .padding(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(104.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(SurfaceElevated, Color(0xFF28243C))
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (song.albumArtUri != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(song.albumArtUri)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = song.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = AccentPrimary,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = song.title,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp
+            ),
+            color = TextPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Text(
+            text = song.artist,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+            color = TextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun QuickActionCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    gradient: List<Color>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .height(72.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+        color = SurfaceCard
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            gradient[0].copy(alpha = 0.25f),
+                            SurfaceCard
+                        )
+                    )
+                )
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(gradient)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    ),
+                    color = TextPrimary
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+            }
+        }
+    }
+}
+
+private fun rememberGreeting(): String {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    return when (hour) {
+        in 5..11 -> "Bonjour"
+        in 12..17 -> "Bon après-midi"
+        else -> "Bonsoir"
     }
 }
