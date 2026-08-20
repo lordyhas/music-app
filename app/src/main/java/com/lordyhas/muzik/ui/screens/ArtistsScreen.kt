@@ -232,6 +232,14 @@ fun ArtistsScreen(
                     viewModel.playSong(shuffled.first(), shuffled)
                 }
             },
+            onPlayNext = { song -> viewModel.playNext(song) },
+            onAddToQueue = { song -> viewModel.addToQueue(song) },
+            onGoToArtist = null,
+            onGoToAlbum = { albumTitle ->
+                viewModel.selectArtist(null)
+                viewModel.navigateToAlbum(albumTitle)
+            },
+            onShowDetails = { song -> viewModel.selectSongForDetails(song) },
             onDismiss = { viewModel.selectArtist(null) }
         )
     }

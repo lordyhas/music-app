@@ -73,6 +73,10 @@ fun MainAppScreen(
     val isShuffle by viewModel.isShuffle.collectAsState()
     val repeatMode by viewModel.repeatMode.collectAsState()
     val showNowPlaying by viewModel.showNowPlaying.collectAsState()
+    val showQueue by viewModel.showQueue.collectAsState()
+    val currentQueue by viewModel.currentQueue.collectAsState()
+    val currentQueueIndex by viewModel.currentQueueIndex.collectAsState()
+    val selectedSongForDetails by viewModel.selectedSongForDetails.collectAsState()
 
     var selectedTab by remember { mutableStateOf(NavigationTab.HOME) }
 
@@ -180,7 +184,28 @@ fun MainAppScreen(
                 onSkipPrevious = { viewModel.skipPrevious() },
                 onToggleShuffle = { viewModel.toggleShuffle() },
                 onToggleRepeat = { viewModel.toggleRepeat() },
-                onDismiss = { viewModel.setShowNowPlaying(false) }
+                onDismiss = { viewModel.setShowNowPlaying(false) },
+                onOpenQueue = { viewModel.setShowQueue(true) }
+            )
+        }
+
+        // Queue Bottom Sheet
+        if (showQueue) {
+            com.lordyhas.muzik.ui.components.QueueSheet(
+                queue = currentQueue,
+                currentIndex = currentQueueIndex,
+                isPlaying = isPlaying,
+                onPlayIndex = { viewModel.playQueueIndex(it) },
+                onRemoveIndex = { viewModel.removeQueueItem(it) },
+                onDismiss = { viewModel.setShowQueue(false) }
+            )
+        }
+
+        // Song Details Dialog / Bottom Sheet
+        selectedSongForDetails?.let { song ->
+            com.lordyhas.muzik.ui.components.SongDetailsDialog(
+                song = song,
+                onDismiss = { viewModel.selectSongForDetails(null) }
             )
         }
     }

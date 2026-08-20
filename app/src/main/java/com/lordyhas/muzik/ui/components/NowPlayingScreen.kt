@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -85,6 +86,7 @@ fun NowPlayingScreen(
     onToggleShuffle: () -> Unit,
     onToggleRepeat: () -> Unit,
     onDismiss: () -> Unit,
+    onOpenQueue: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (song == null) return
@@ -154,7 +156,24 @@ fun NowPlayingScreen(
                     color = AccentPrimary
                 )
 
-                Box(modifier = Modifier.size(44.dp))
+                if (onOpenQueue != null) {
+                    IconButton(
+                        onClick = onOpenQueue,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(SurfaceCard)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.QueueMusic,
+                            contentDescription = "File d'attente",
+                            tint = AccentPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                } else {
+                    Box(modifier = Modifier.size(44.dp))
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

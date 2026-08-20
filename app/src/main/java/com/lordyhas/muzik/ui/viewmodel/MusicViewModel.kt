@@ -41,6 +41,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _showNowPlaying = MutableStateFlow(false)
     val showNowPlaying: StateFlow<Boolean> = _showNowPlaying.asStateFlow()
 
+    private val _showQueue = MutableStateFlow(false)
+    val showQueue: StateFlow<Boolean> = _showQueue.asStateFlow()
+
+    private val _selectedSongForDetails = MutableStateFlow<Song?>(null)
+    val selectedSongForDetails: StateFlow<Song?> = _selectedSongForDetails.asStateFlow()
+
+    val currentQueue: StateFlow<List<Song>> = musicController.currentQueue
+    val currentQueueIndex: StateFlow<Int> = musicController.currentMediaItemIndex
+
     private val _recentSongIds = MutableStateFlow<List<Long>>(loadRecentSongIds())
 
     // Detail sheets
@@ -220,6 +229,61 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setShowNowPlaying(show: Boolean) {
         _showNowPlaying.value = show
+    }
+
+    fun setShowQueue(show: Boolean) {
+        _showQueue.value = show
+    }
+
+    fun selectSongForDetails(song: Song?) {
+        _selectedSongForDetails.value = song
+    }
+
+    fun playNext(song: Song) {
+        musicController.playNext(song)
+    }
+
+    fun addToQueue(song: Song) {
+        musicController.addToQueue(song)
+    }
+
+    fun removeQueueItem(index: Int) {
+        musicController.removeQueueItem(index)
+    }
+
+    fun playQueueIndex(index: Int) {
+        musicController.playQueueIndex(index)
+    }
+
+    fun navigateToArtist(artistName: String) {
+        val target = artists.value.firstOrNull { it.name.equals(artistName, ignoreCase = true) }
+            ?: artists.value.firstOrNull { it.name.contains(artistName, ignoreCase = true) }
+            ?: Artist(
+                name = artistName,
+                songCount = _songs.value.count { it.artist.equals(artistName, ignoreCase = true) },
+                albumCount = _songs.value.filter { it.artist.equals(artistName, ignoreCase = true) }.map { it.album }.distinct().size,
+                songs = _songs.value.filter { it.artist.equals(artistName, ignoreCase = true) }
+            )
+        _selectedArtist.value = target
+    }
+
+    fun navigateToAlbum(albumTitle: String) {
+        val target = albums.value.firstOrNull { it.title.equals(albumTitle, ignoreCase = true) }
+            ?: albums.value.firstOrNull { it.title.contains(albumTitle, ignoreCase = true) }
+            ?: run {
+                val albumSongs = _songs.value.filter { it.album.equals(albumTitle, ignoreCase = true) }
+                if (albumSongs.isNotEmpty()) {
+                    Album(
+                        id = albumSongs.first().albumId,
+                        title = albumTitle,
+                        artist = albumSongs.first().artist,
+                        albumArtUri = albumSongs.firstOrNull { it.albumArtUri != null }?.albumArtUri,
+                        songCount = albumSongs.size,
+                        songs = albumSongs
+                    )
+                } else null
+            }
+        _selectedAlbum.value = target
     }
 
     fun selectAlbum(album: Album?) {

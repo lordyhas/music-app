@@ -13,17 +13,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Equalizer
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,14 +42,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.ui.theme.AccentPrimary
-import com.lordyhas.muzik.ui.theme.AccentSecondary
 import com.lordyhas.muzik.ui.theme.SurfaceCard
 import com.lordyhas.muzik.ui.theme.SurfaceElevated
 import com.lordyhas.muzik.ui.theme.TextMuted
@@ -53,8 +60,15 @@ fun SongItem(
     isSelected: Boolean,
     isPlaying: Boolean,
     onClick: () -> Unit,
+    onPlayNext: (() -> Unit)? = null,
+    onAddToQueue: (() -> Unit)? = null,
+    onGoToArtist: (() -> Unit)? = null,
+    onGoToAlbum: (() -> Unit)? = null,
+    onShowDetails: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var isMenuExpanded by remember { mutableStateOf(false) }
+
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) SurfaceElevated else SurfaceCard,
         label = "item_bg"
@@ -147,24 +161,121 @@ fun SongItem(
             )
         }
 
-        Spacer(modifier = Modifier.width(10.dp))
-        IconButton(
-            onClick = { /* doSomething */ },
-        ) {
-            Icon(
-                Icons.Filled.MoreVert,
-                contentDescription = "Menu",
-                modifier = Modifier.size(24.dp)
-            )
-        }
+        Spacer(modifier = Modifier.width(6.dp))
 
-        // Duration
-        /*Text(
-            text = song.formattedDuration(),
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 12.sp
-            ),
-            color = TextMuted
-        )*/
+        // Options Menu
+        Box {
+            IconButton(
+                onClick = { isMenuExpanded = true },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Options du morceau",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            DropdownMenu(
+                expanded = isMenuExpanded,
+                onDismissRequest = { isMenuExpanded = false },
+                modifier = Modifier
+                    .background(SurfaceElevated)
+                    .clip(RoundedCornerShape(12.dp))
+            ) {
+                if (onPlayNext != null) {
+                    DropdownMenuItem(
+                        text = { Text("Lire juste après", color = TextPrimary, fontSize = 14.sp) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.QueueMusic,
+                                contentDescription = null,
+                                tint = AccentPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = {
+                            isMenuExpanded = false
+                            onPlayNext()
+                        },
+                        colors = MenuDefaults.itemColors()
+                    )
+                }
+
+                if (onAddToQueue != null) {
+                    DropdownMenuItem(
+                        text = { Text("Ajouter à la file", color = TextPrimary, fontSize = 14.sp) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.PlaylistAdd,
+                                contentDescription = null,
+                                tint = AccentPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = {
+                            isMenuExpanded = false
+                            onAddToQueue()
+                        }
+                    )
+                }
+
+                if (onGoToArtist != null) {
+                    DropdownMenuItem(
+                        text = { Text("Aller à l'artiste", color = TextPrimary, fontSize = 14.sp) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Person,
+                                contentDescription = null,
+                                tint = TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = {
+                            isMenuExpanded = false
+                            onGoToArtist()
+                        }
+                    )
+                }
+
+                if (onGoToAlbum != null) {
+                    DropdownMenuItem(
+                        text = { Text("Aller à l'album", color = TextPrimary, fontSize = 14.sp) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Album,
+                                contentDescription = null,
+                                tint = TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = {
+                            isMenuExpanded = false
+                            onGoToAlbum()
+                        }
+                    )
+                }
+
+                if (onShowDetails != null) {
+                    DropdownMenuItem(
+                        text = { Text("Détails du morceau", color = TextPrimary, fontSize = 14.sp) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                tint = TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = {
+                            isMenuExpanded = false
+                            onShowDetails()
+                        }
+                    )
+                }
+            }
+        }
     }
 }
+

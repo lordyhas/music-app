@@ -1,6 +1,7 @@
 package com.lordyhas.muzik.ui.components
 
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -72,35 +74,44 @@ fun SongListSheet(
     onPlayAll: () -> Unit,
     onShuffleAll: () -> Unit,
     onDismiss: () -> Unit,
+    onPlayNext: ((Song) -> Unit)? = null,
+    onAddToQueue: ((Song) -> Unit)? = null,
+    onGoToArtist: ((String) -> Unit)? = null,
+    onGoToAlbum: ((String) -> Unit)? = null,
+    onShowDetails: ((Song) -> Unit)? = null,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = SurfaceDark,
-        dragHandle = null,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .size(width = 40.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(TextSecondary.copy(alpha = 0.4f))
+            )
+        },
+        modifier = Modifier.fillMaxHeight(0.9f)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
+                .padding(horizontal = 20.dp)
+                .navigationBarsPadding()
         ) {
-            // Header with Artwork, Title, and Close button
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(80.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(AccentSecondary, SurfaceElevated)
-                            )
-                        ),
+                        .background(SurfaceElevated),
                     contentAlignment = Alignment.Center
                 ) {
                     if (artworkUri != null) {
@@ -109,7 +120,7 @@ fun SongListSheet(
                                 .data(artworkUri)
                                 .crossfade(true)
                                 .build(),
-                            contentDescription = title,
+                            contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.matchParentSize()
                         )
@@ -118,33 +129,37 @@ fun SongListSheet(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
                             tint = AccentPrimary,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(36.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleMedium.copy(
+                        style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp
+                            fontSize = 20.sp
                         ),
                         color = TextPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "${songs.size} titre${if (songs.size > 1) "s" else ""}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = AccentPrimary
                     )
                 }
 
@@ -152,7 +167,7 @@ fun SongListSheet(
                     onClick = onDismiss,
                     modifier = Modifier
                         .size(36.dp)
-                        .clip(CircleShape)
+                        .clip(RoundedCornerShape(18.dp))
                         .background(SurfaceCard)
                 ) {
                     Icon(
@@ -164,33 +179,34 @@ fun SongListSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             // Action Buttons (Play All & Shuffle)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Button(
                     onClick = onPlayAll,
                     modifier = Modifier
                         .weight(1f)
-                        .height(44.dp),
+                        .height(46.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AccentPrimary,
-                        contentColor = Color.White
-                    )
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary)
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Tout lire",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     )
                 }
 
@@ -198,11 +214,10 @@ fun SongListSheet(
                     onClick = onShuffleAll,
                     modifier = Modifier
                         .weight(1f)
-                        .height(44.dp),
+                        .height(46.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = TextPrimary
-                    )
+                    border = BorderStroke(1.dp, AccentSecondary.copy(alpha = 0.5f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentSecondary)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Shuffle,
@@ -213,7 +228,10 @@ fun SongListSheet(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Aléatoire",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = AccentSecondary
+                        )
                     )
                 }
             }
@@ -232,7 +250,12 @@ fun SongListSheet(
                         song = song,
                         isSelected = isSelected,
                         isPlaying = isPlaying && isSelected,
-                        onClick = { onSongClick(song) }
+                        onClick = { onSongClick(song) },
+                        onPlayNext = if (onPlayNext != null) { { onPlayNext(song) } } else null,
+                        onAddToQueue = if (onAddToQueue != null) { { onAddToQueue(song) } } else null,
+                        onGoToArtist = if (onGoToArtist != null) { { onGoToArtist(song.artist) } } else null,
+                        onGoToAlbum = if (onGoToAlbum != null) { { onGoToAlbum(song.album) } } else null,
+                        onShowDetails = if (onShowDetails != null) { { onShowDetails(song) } } else null
                     )
                 }
             }

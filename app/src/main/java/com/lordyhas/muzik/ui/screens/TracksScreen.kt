@@ -225,7 +225,12 @@ fun TracksScreen(
                         song = song,
                         isSelected = isSelected,
                         isPlaying = isPlaying && isSelected,
-                        onClick = { viewModel.playSong(song) }
+                        onClick = { viewModel.playSong(song) },
+                        onPlayNext = { viewModel.playNext(song) },
+                        onAddToQueue = { viewModel.addToQueue(song) },
+                        onGoToArtist = { viewModel.navigateToArtist(song.artist) },
+                        onGoToAlbum = { viewModel.navigateToAlbum(song.album) },
+                        onShowDetails = { viewModel.selectSongForDetails(song) }
                     )
                 }
             }
