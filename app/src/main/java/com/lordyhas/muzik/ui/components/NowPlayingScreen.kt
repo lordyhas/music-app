@@ -2,7 +2,10 @@ package com.lordyhas.muzik.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,8 +49,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -71,6 +77,7 @@ import com.lordyhas.muzik.ui.theme.TextSecondary
 import com.lordyhas.muzik.ui.theme.TrackBackground
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlayingScreen(
     song: Song?,
@@ -118,6 +125,12 @@ fun NowPlayingScreen(
                     )
                 )
             )
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) {
+                // Consume all tap events to prevent click-through to background screens
+            }
             .statusBarsPadding()
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
@@ -263,7 +276,7 @@ fun NowPlayingScreen(
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Slider(
+                ThinSlider(
                     value = sliderProgress,
                     onValueChange = {
                         isDragging = true
@@ -274,11 +287,6 @@ fun NowPlayingScreen(
                         onSeekTo(targetMs)
                         isDragging = false
                     },
-                    colors = SliderDefaults.colors(
-                        thumbColor = AccentPrimary,
-                        activeTrackColor = AccentPrimary,
-                        inactiveTrackColor = TrackBackground
-                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
