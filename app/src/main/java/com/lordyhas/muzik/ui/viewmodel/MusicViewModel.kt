@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
+import com.lordyhas.muzik.data.local.PlaylistEntity
 import com.lordyhas.muzik.data.model.Album
 import com.lordyhas.muzik.data.model.Artist
 import com.lordyhas.muzik.data.model.Playlist
@@ -62,41 +63,55 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedArtist = MutableStateFlow<Artist?>(null)
     val selectedArtist: StateFlow<Artist?> = _selectedArtist.asStateFlow()
 
-    // ─── Playlists ───────────────────────────────────────────────────────────────
+    // ─── Playlists (Room-backed) ──────────────────────────────────────────────
 
-    /** Raw playlist data (songIds only) loaded from SharedPreferences */
-    private val _rawPlaylists = MutableStateFlow<List<Playlist>>(playlistRepository.getPlaylists())
-
-    /** Playlists enriched with resolved Song objects, recomputed whenever songs or raw playlists change */
-    val playlists: StateFlow<List<Playlist>> = combine(_rawPlaylists, _songs) { rawList, songList ->
+    /**
+     * Live Flow from Room: all playlists enriched with resolved Songs.
+     * Room automatically re-emits whenever the DB changes — no manual refresh needed.
+     */
+    val playlists: StateFlow<List<Playlist>> = combine(
+        playlistRepository.getAllPlaylists(),    // Flow<List<PlaylistEntity>>
+        playlistRepository.getAllPlaylistSongs(), // Flow<List<PlaylistSongRow>>
+        _songs                                   // StateFlow<List<Song>>
+    ) { entities, songRows, songList ->
         val songMap = songList.associateBy { it.id }
-        rawList.map { p ->
-            p.copy(songs = p.songIds.mapNotNull { songMap[it] })
+        // Build a map: playlistId → ordered list of songIds
+        val songIdsByPlaylist: Map<String, List<Long>> = songRows
+            .groupBy { it.playlistId }
+            .mapValues { (_, rows) -> rows.map { it.songId } }
+
+        entities.map { entity ->
+            val songIds = songIdsByPlaylist[entity.id] ?: emptyList()
+            Playlist(
+                id = entity.id,
+                name = entity.name,
+                songIds = songIds,
+                createdAt = entity.createdAt,
+                songs = songIds.mapNotNull { songMap[it] }
+            )
         }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    /** Playlist currently opened in detail sheet */
-    private val _selectedPlaylist = MutableStateFlow<Playlist?>(null)
-    val selectedPlaylist: StateFlow<Playlist?> = combine(_selectedPlaylist, _songs) { selected, songList ->
-        selected?.let { p ->
-            val songMap = songList.associateBy { it.id }
-            p.copy(songs = p.songIds.mapNotNull { songMap[it] })
-        }
+    /** Playlist currently opened in detail sheet (kept in sync with Room via playlists flow). */
+    private val _selectedPlaylistId = MutableStateFlow<String?>(null)
+
+    val selectedPlaylist: StateFlow<Playlist?> = combine(_selectedPlaylistId, playlists) { id, list ->
+        id?.let { list.find { p -> p.id == it } }
     }.stateIn(viewModelScope, SharingStarted.Lazily, null)
 
-    /** Controls Create-playlist dialog visibility */
+    /** Controls Create-playlist dialog visibility. */
     private val _showCreatePlaylistDialog = MutableStateFlow(false)
     val showCreatePlaylistDialog: StateFlow<Boolean> = _showCreatePlaylistDialog.asStateFlow()
 
-    /** Song waiting to be added to a playlist (triggers AddToPlaylistSheet) */
+    /** Song waiting to be added to a playlist (triggers AddToPlaylistSheet). */
     private val _songPendingAddToPlaylist = MutableStateFlow<Song?>(null)
     val songPendingAddToPlaylist: StateFlow<Song?> = _songPendingAddToPlaylist.asStateFlow()
 
-    /** Playlist being renamed (triggers rename dialog) */
+    /** Playlist being renamed (triggers rename dialog). */
     private val _playlistPendingRename = MutableStateFlow<Playlist?>(null)
     val playlistPendingRename: StateFlow<Playlist?> = _playlistPendingRename.asStateFlow()
 
-    // ─────────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     val filteredSongs: StateFlow<List<Song>> = combine(_songs, _searchQuery) { songList, query ->
         if (query.isBlank()) {
@@ -186,9 +201,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setPermissionGranted(granted: Boolean) {
         _isPermissionGranted.value = granted
-        if (granted) {
-            loadSongs()
-        }
+        if (granted) loadSongs()
     }
 
     fun loadSongs() {
@@ -254,53 +267,20 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun seekTo(positionMs: Long) {
-        musicController.seekTo(positionMs)
-    }
+    fun seekTo(positionMs: Long) { musicController.seekTo(positionMs) }
+    fun skipNext() { musicController.skipToNext() }
+    fun skipPrevious() { musicController.skipToPrevious() }
+    fun toggleShuffle() { musicController.toggleShuffle() }
+    fun toggleRepeat() { musicController.toggleRepeat() }
 
-    fun skipNext() {
-        musicController.skipToNext()
-    }
+    fun setShowNowPlaying(show: Boolean) { _showNowPlaying.value = show }
+    fun setShowQueue(show: Boolean) { _showQueue.value = show }
+    fun selectSongForDetails(song: Song?) { _selectedSongForDetails.value = song }
 
-    fun skipPrevious() {
-        musicController.skipToPrevious()
-    }
-
-    fun toggleShuffle() {
-        musicController.toggleShuffle()
-    }
-
-    fun toggleRepeat() {
-        musicController.toggleRepeat()
-    }
-
-    fun setShowNowPlaying(show: Boolean) {
-        _showNowPlaying.value = show
-    }
-
-    fun setShowQueue(show: Boolean) {
-        _showQueue.value = show
-    }
-
-    fun selectSongForDetails(song: Song?) {
-        _selectedSongForDetails.value = song
-    }
-
-    fun playNext(song: Song) {
-        musicController.playNext(song)
-    }
-
-    fun addToQueue(song: Song) {
-        musicController.addToQueue(song)
-    }
-
-    fun removeQueueItem(index: Int) {
-        musicController.removeQueueItem(index)
-    }
-
-    fun playQueueIndex(index: Int) {
-        musicController.playQueueIndex(index)
-    }
+    fun playNext(song: Song) { musicController.playNext(song) }
+    fun addToQueue(song: Song) { musicController.addToQueue(song) }
+    fun removeQueueItem(index: Int) { musicController.removeQueueItem(index) }
+    fun playQueueIndex(index: Int) { musicController.playQueueIndex(index) }
 
     fun navigateToArtist(artistName: String) {
         val target = artists.value.firstOrNull { it.name.equals(artistName, ignoreCase = true) }
@@ -333,71 +313,46 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _selectedAlbum.value = target
     }
 
-    fun selectAlbum(album: Album?) {
-        _selectedAlbum.value = album
-    }
+    fun selectAlbum(album: Album?) { _selectedAlbum.value = album }
+    fun selectArtist(artist: Artist?) { _selectedArtist.value = artist }
 
-    fun selectArtist(artist: Artist?) {
-        _selectedArtist.value = artist
-    }
-
-    // ─── Playlist Actions ─────────────────────────────────────────────────────────
+    // ─── Playlist Actions ─────────────────────────────────────────────────────
 
     fun selectPlaylist(playlist: Playlist?) {
-        _selectedPlaylist.value = playlist
+        _selectedPlaylistId.value = playlist?.id
     }
 
-    fun setShowCreatePlaylistDialog(show: Boolean) {
-        _showCreatePlaylistDialog.value = show
-    }
-
-    fun setSongPendingAddToPlaylist(song: Song?) {
-        _songPendingAddToPlaylist.value = song
-    }
-
-    fun setPlaylistPendingRename(playlist: Playlist?) {
-        _playlistPendingRename.value = playlist
-    }
+    fun setShowCreatePlaylistDialog(show: Boolean) { _showCreatePlaylistDialog.value = show }
+    fun setSongPendingAddToPlaylist(song: Song?) { _songPendingAddToPlaylist.value = song }
+    fun setPlaylistPendingRename(playlist: Playlist?) { _playlistPendingRename.value = playlist }
 
     fun createPlaylist(name: String) {
         if (name.isBlank()) return
-        playlistRepository.createPlaylist(name)
-        _rawPlaylists.value = playlistRepository.getPlaylists()
+        viewModelScope.launch { playlistRepository.createPlaylist(name) }
+        // Room Flow auto-updates playlists StateFlow — no manual refresh
     }
 
     fun deletePlaylist(id: String) {
-        playlistRepository.deletePlaylist(id)
-        _rawPlaylists.value = playlistRepository.getPlaylists()
-        if (_selectedPlaylist.value?.id == id) _selectedPlaylist.value = null
+        viewModelScope.launch {
+            playlistRepository.deletePlaylist(id)
+            if (_selectedPlaylistId.value == id) _selectedPlaylistId.value = null
+        }
     }
 
     fun renamePlaylist(id: String, newName: String) {
         if (newName.isBlank()) return
-        playlistRepository.renamePlaylist(id, newName)
-        _rawPlaylists.value = playlistRepository.getPlaylists()
-        // Update selectedPlaylist if it's the renamed one
-        _selectedPlaylist.value?.let { sel ->
-            if (sel.id == id) _selectedPlaylist.value = sel.copy(name = newName.trim())
-        }
+        viewModelScope.launch { playlistRepository.renamePlaylist(id, newName) }
     }
 
     fun addSongToPlaylist(playlistId: String, songId: Long) {
-        playlistRepository.addSongToPlaylist(playlistId, songId)
-        _rawPlaylists.value = playlistRepository.getPlaylists()
+        viewModelScope.launch { playlistRepository.addSongToPlaylist(playlistId, songId) }
     }
 
     fun removeSongFromPlaylist(playlistId: String, songId: Long) {
-        playlistRepository.removeSongFromPlaylist(playlistId, songId)
-        _rawPlaylists.value = playlistRepository.getPlaylists()
-        // Refresh selected playlist
-        _selectedPlaylist.value?.let { sel ->
-            if (sel.id == playlistId) {
-                _selectedPlaylist.value = sel.copy(songIds = sel.songIds.filter { it != songId })
-            }
-        }
+        viewModelScope.launch { playlistRepository.removeSongFromPlaylist(playlistId, songId) }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
 
     private fun addToRecentHistory(songId: Long) {
         val current = _recentSongIds.value.toMutableList()
@@ -414,8 +369,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun saveRecentSongIds(ids: List<Long>) {
-        val raw = ids.joinToString(",")
-        prefs.edit().putString("recent_song_ids", raw).apply()
+        prefs.edit().putString("recent_song_ids", ids.joinToString(",")).apply()
     }
 
     override fun onCleared() {

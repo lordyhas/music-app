@@ -1,0 +1,114 @@
+package com.lordyhas.muzik.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.lordyhas.muzik.ui.theme.AccentPrimary
+import com.lordyhas.muzik.ui.theme.SurfaceCard
+import com.lordyhas.muzik.ui.theme.SurfaceElevated
+import com.lordyhas.muzik.ui.theme.TextMuted
+import com.lordyhas.muzik.ui.theme.TextPrimary
+import com.lordyhas.muzik.ui.theme.TextSecondary
+
+/**
+ * Reusable dialog for creating a new playlist or renaming an existing one.
+ *
+ * @param title       Dialog title (e.g. "Nouvelle playlist" or "Renommer")
+ * @param initialName Pre-filled name (empty for creation, existing name for rename)
+ * @param onConfirm   Called with the trimmed name when the user confirms
+ * @param onDismiss   Called when the dialog is dismissed
+ */
+@Composable
+fun CreatePlaylistDialog(
+    title: String = "Nouvelle playlist",
+    initialName: String = "",
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf(initialName) }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceCard,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary
+            )
+        },
+        text = {
+            Column {
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                    placeholder = {
+                        Text(
+                            text = "Nom de la playlist",
+                            color = TextMuted,
+                            fontSize = 14.sp
+                        )
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = SurfaceElevated,
+                        unfocusedContainerColor = SurfaceElevated,
+                        focusedBorderColor = AccentPrimary,
+                        unfocusedBorderColor = TextMuted.copy(alpha = 0.3f),
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        cursorColor = AccentPrimary
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (name.isNotBlank()) onConfirm(name.trim()) },
+                enabled = name.isNotBlank()
+            ) {
+                Text(
+                    text = "Confirmer",
+                    color = if (name.isNotBlank()) AccentPrimary else TextMuted
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "Annuler", color = TextSecondary)
+            }
+        }
+    )
+}
