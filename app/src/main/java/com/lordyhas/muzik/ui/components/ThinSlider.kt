@@ -57,7 +57,7 @@ fun ThinSlider(
                     (sliderState.value - sliderState.valueRange.start) / range
                 } else 0f
 
-                // Track inactif (fond complet)
+                // Track inactive (full background)
                 drawLine(
                     color = inactiveTrackColor,
                     start = Offset(0f, size.height / 2),
@@ -66,7 +66,7 @@ fun ThinSlider(
                     cap = StrokeCap.Round
                 )
 
-                // Track actif (progression)
+                // Track active (progression)
                 drawLine(
                     color = activeTrackColor,
                     start = Offset(0f, size.height / 2),

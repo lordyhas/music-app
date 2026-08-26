@@ -55,7 +55,6 @@ import androidx.media3.common.util.UnstableApi
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.lordyhas.muzik.data.model.Artist
-import com.lordyhas.muzik.ui.components.SongListSheet
 import com.lordyhas.muzik.ui.theme.AccentCyan
 import com.lordyhas.muzik.ui.theme.AccentPrimary
 import com.lordyhas.muzik.ui.theme.AccentSecondary
@@ -72,12 +71,10 @@ import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
 @Composable
 fun ArtistsScreen(
     viewModel: MusicViewModel,
+    onArtistClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val artists by viewModel.artists.collectAsState()
-    val selectedArtist by viewModel.selectedArtist.collectAsState()
-    val currentSong by viewModel.currentSong.collectAsState()
-    val isPlaying by viewModel.isPlaying.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
@@ -208,41 +205,11 @@ fun ArtistsScreen(
                 items(filteredArtists, key = { it.name }) { artist ->
                     ArtistListItem(
                         artist = artist,
-                        onClick = { viewModel.selectArtist(artist) }
+                        onClick = { onArtistClick(artist.name) }
                     )
                 }
             }
         }
-    }
-
-    // Modal Sheet showing artist songs
-    selectedArtist?.let { artist ->
-        SongListSheet(
-            title = artist.name,
-            subtitle = "${artist.songCount} titres • ${artist.albumCount} album${if (artist.albumCount > 1) "s" else ""}",
-            artworkUri = artist.artworkUri,
-            songs = artist.songs,
-            currentSongId = currentSong?.id,
-            isPlaying = isPlaying,
-            onSongClick = { song -> viewModel.playArtist(artist, song) },
-            onPlayAll = { viewModel.playArtist(artist) },
-            onShuffleAll = {
-                val shuffled = artist.songs.shuffled()
-                if (shuffled.isNotEmpty()) {
-                    viewModel.playSong(shuffled.first(), shuffled)
-                }
-            },
-            onPlayNext = { song -> viewModel.playNext(song) },
-            onAddToQueue = { song -> viewModel.addToQueue(song) },
-            onAddToPlaylist = { song -> viewModel.setSongPendingAddToPlaylist(song) },
-            onGoToArtist = null,
-            onGoToAlbum = { albumTitle ->
-                viewModel.selectArtist(null)
-                viewModel.navigateToAlbum(albumTitle)
-            },
-            onShowDetails = { song -> viewModel.selectSongForDetails(song) },
-            onDismiss = { viewModel.selectArtist(null) }
-        )
     }
 }
 

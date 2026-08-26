@@ -56,6 +56,8 @@ import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
 @Composable
 fun TracksScreen(
     viewModel: MusicViewModel,
+    onGoToArtist: (String) -> Unit,
+    onGoToAlbum: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val songs by viewModel.filteredSongs.collectAsState()
@@ -229,8 +231,8 @@ fun TracksScreen(
                         onPlayNext = { viewModel.playNext(song) },
                         onAddToQueue = { viewModel.addToQueue(song) },
                         onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
-                        onGoToArtist = { viewModel.navigateToArtist(song.artist) },
-                        onGoToAlbum = { viewModel.navigateToAlbum(song.album) },
+                        onGoToArtist = { onGoToArtist(song.artist) },
+                        onGoToAlbum = { onGoToAlbum(song.album) },
                         onShowDetails = { viewModel.selectSongForDetails(song) }
                     )
                 }

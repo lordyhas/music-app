@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.lordyhas.muzik.ui.components.CreatePlaylistDialog
 import com.lordyhas.muzik.ui.components.PlaylistCard
-import com.lordyhas.muzik.ui.components.SongListSheet
 import com.lordyhas.muzik.ui.theme.AccentPrimary
 import com.lordyhas.muzik.ui.theme.BackgroundDark
 import com.lordyhas.muzik.ui.theme.SurfaceCard
@@ -53,14 +52,12 @@ import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
 @Composable
 fun PlaylistsScreen(
     viewModel: MusicViewModel,
+    onPlaylistClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val playlists by viewModel.playlists.collectAsState()
-    val selectedPlaylist by viewModel.selectedPlaylist.collectAsState()
     val showCreateDialog by viewModel.showCreatePlaylistDialog.collectAsState()
     val playlistPendingRename by viewModel.playlistPendingRename.collectAsState()
-    val currentSong by viewModel.currentSong.collectAsState()
-    val isPlaying by viewModel.isPlaying.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
     Box(
@@ -151,7 +148,7 @@ fun PlaylistsScreen(
                     items(playlists, key = { it.id }) { playlist ->
                         PlaylistCard(
                             playlist = playlist,
-                            onClick = { viewModel.selectPlaylist(playlist) },
+                            onClick = { onPlaylistClick(playlist.id) },
                             onRename = { viewModel.setPlaylistPendingRename(playlist) },
                             onDelete = { viewModel.deletePlaylist(playlist.id) }
                         )
@@ -200,34 +197,6 @@ fun PlaylistsScreen(
                 viewModel.setPlaylistPendingRename(null)
             },
             onDismiss = { viewModel.setPlaylistPendingRename(null) }
-        )
-    }
-
-    // ─── Playlist Detail Sheet ────────────────────────────────────────────────
-    selectedPlaylist?.let { playlist ->
-        SongListSheet(
-            title = playlist.name,
-            subtitle = "Playlist",
-            artworkUri = playlist.songs.firstOrNull { it.albumArtUri != null }?.albumArtUri,
-            songs = playlist.songs,
-            currentSongId = currentSong?.id,
-            isPlaying = isPlaying,
-            onSongClick = { song -> viewModel.playPlaylist(playlist, song) },
-            onPlayAll = { viewModel.playPlaylist(playlist) },
-            onShuffleAll = {
-                val shuffled = playlist.songs.shuffled()
-                if (shuffled.isNotEmpty()) viewModel.playSong(shuffled.first(), shuffled)
-            },
-            onPlayNext = { song -> viewModel.playNext(song) },
-            onAddToQueue = { song -> viewModel.addToQueue(song) },
-            onRemoveFromPlaylist = { song -> viewModel.removeSongFromPlaylist(playlist.id, song.id) },
-            onGoToArtist = { artistName -> viewModel.navigateToArtist(artistName) },
-            onGoToAlbum = { albumTitle ->
-                viewModel.selectPlaylist(null)
-                viewModel.navigateToAlbum(albumTitle)
-            },
-            onShowDetails = { song -> viewModel.selectSongForDetails(song) },
-            onDismiss = { viewModel.selectPlaylist(null) }
         )
     }
 }

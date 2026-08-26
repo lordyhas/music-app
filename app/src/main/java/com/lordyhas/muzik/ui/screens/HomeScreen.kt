@@ -57,7 +57,6 @@ import coil.request.ImageRequest
 import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.ui.components.AlbumCard
 import com.lordyhas.muzik.ui.components.ArtistCard
-import com.lordyhas.muzik.ui.components.SongListSheet
 import com.lordyhas.muzik.ui.theme.AccentCyan
 import com.lordyhas.muzik.ui.theme.AccentPrimary
 import com.lordyhas.muzik.ui.theme.AccentSecondary
@@ -75,16 +74,14 @@ import java.util.Calendar
 @Composable
 fun HomeScreen(
     viewModel: MusicViewModel,
+    onAlbumClick: (String) -> Unit,
+    onArtistClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val songs by viewModel.songs.collectAsState()
     val recentSongs by viewModel.recentlyPlayedSongs.collectAsState()
     val recentAlbums by viewModel.recentlyPlayedAlbums.collectAsState()
     val recentArtists by viewModel.recentlyPlayedArtists.collectAsState()
-    val selectedAlbum by viewModel.selectedAlbum.collectAsState()
-    val selectedArtist by viewModel.selectedArtist.collectAsState()
-    val currentSong by viewModel.currentSong.collectAsState()
-    val isPlaying by viewModel.isPlaying.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
     val greeting = rememberGreeting()
@@ -238,7 +235,7 @@ fun HomeScreen(
                     items(recentAlbums, key = { it.title + it.id }) { album ->
                         AlbumCard(
                             album = album,
-                            onClick = { viewModel.selectAlbum(album) },
+                            onClick = { onAlbumClick(album.title) },
                             modifier = Modifier.width(140.dp)
                         )
                     }
@@ -258,54 +255,12 @@ fun HomeScreen(
                     items(recentArtists, key = { it.name }) { artist ->
                         ArtistCard(
                             artist = artist,
-                            onClick = { viewModel.selectArtist(artist) }
+                            onClick = { onArtistClick(artist.name) }
                         )
                     }
                 }
             }
         }
-    }
-
-    // Modal Sheet showing album songs
-    selectedAlbum?.let { album ->
-        SongListSheet(
-            title = album.title,
-            subtitle = "${album.artist} • ${album.songCount} titres",
-            artworkUri = album.albumArtUri,
-            songs = album.songs,
-            currentSongId = currentSong?.id,
-            isPlaying = isPlaying,
-            onSongClick = { song -> viewModel.playAlbum(album, song) },
-            onPlayAll = { viewModel.playAlbum(album) },
-            onShuffleAll = {
-                val shuffled = album.songs.shuffled()
-                if (shuffled.isNotEmpty()) {
-                    viewModel.playSong(shuffled.first(), shuffled)
-                }
-            },
-            onDismiss = { viewModel.selectAlbum(null) }
-        )
-    }
-
-    // Modal Sheet showing artist songs
-    selectedArtist?.let { artist ->
-        SongListSheet(
-            title = artist.name,
-            subtitle = "${artist.songCount} titres • ${artist.albumCount} album${if (artist.albumCount > 1) "s" else ""}",
-            artworkUri = artist.artworkUri,
-            songs = artist.songs,
-            currentSongId = currentSong?.id,
-            isPlaying = isPlaying,
-            onSongClick = { song -> viewModel.playArtist(artist, song) },
-            onPlayAll = { viewModel.playArtist(artist) },
-            onShuffleAll = {
-                val shuffled = artist.songs.shuffled()
-                if (shuffled.isNotEmpty()) {
-                    viewModel.playSong(shuffled.first(), shuffled)
-                }
-            },
-            onDismiss = { viewModel.selectArtist(null) }
-        )
     }
 }
 

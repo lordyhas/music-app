@@ -13,8 +13,8 @@ android {
         applicationId = "com.lordyhas.muzik"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.1.0"
+        versionCode = 2
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.navigation.compose)
 
     // Media3
     implementation(libs.androidx.media3.exoplayer)
