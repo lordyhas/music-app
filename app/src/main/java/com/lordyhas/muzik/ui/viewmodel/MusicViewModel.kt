@@ -7,8 +7,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
 import com.lordyhas.muzik.data.model.Album
 import com.lordyhas.muzik.data.model.Artist
+import com.lordyhas.muzik.data.model.Playlist
 import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.data.repository.MusicRepository
+import com.lordyhas.muzik.data.repository.PlaylistRepository
 import com.lordyhas.muzik.service.MusicController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,6 +26,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("muzik_prefs", Context.MODE_PRIVATE)
     private val repository = MusicRepository(application)
+    private val playlistRepository = PlaylistRepository(application)
     val musicController = MusicController(application)
 
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
@@ -58,6 +61,42 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _selectedArtist = MutableStateFlow<Artist?>(null)
     val selectedArtist: StateFlow<Artist?> = _selectedArtist.asStateFlow()
+
+    // ─── Playlists ───────────────────────────────────────────────────────────────
+
+    /** Raw playlist data (songIds only) loaded from SharedPreferences */
+    private val _rawPlaylists = MutableStateFlow<List<Playlist>>(playlistRepository.getPlaylists())
+
+    /** Playlists enriched with resolved Song objects, recomputed whenever songs or raw playlists change */
+    val playlists: StateFlow<List<Playlist>> = combine(_rawPlaylists, _songs) { rawList, songList ->
+        val songMap = songList.associateBy { it.id }
+        rawList.map { p ->
+            p.copy(songs = p.songIds.mapNotNull { songMap[it] })
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /** Playlist currently opened in detail sheet */
+    private val _selectedPlaylist = MutableStateFlow<Playlist?>(null)
+    val selectedPlaylist: StateFlow<Playlist?> = combine(_selectedPlaylist, _songs) { selected, songList ->
+        selected?.let { p ->
+            val songMap = songList.associateBy { it.id }
+            p.copy(songs = p.songIds.mapNotNull { songMap[it] })
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, null)
+
+    /** Controls Create-playlist dialog visibility */
+    private val _showCreatePlaylistDialog = MutableStateFlow(false)
+    val showCreatePlaylistDialog: StateFlow<Boolean> = _showCreatePlaylistDialog.asStateFlow()
+
+    /** Song waiting to be added to a playlist (triggers AddToPlaylistSheet) */
+    private val _songPendingAddToPlaylist = MutableStateFlow<Song?>(null)
+    val songPendingAddToPlaylist: StateFlow<Song?> = _songPendingAddToPlaylist.asStateFlow()
+
+    /** Playlist being renamed (triggers rename dialog) */
+    private val _playlistPendingRename = MutableStateFlow<Playlist?>(null)
+    val playlistPendingRename: StateFlow<Playlist?> = _playlistPendingRename.asStateFlow()
+
+    // ─────────────────────────────────────────────────────────────────────────────
 
     val filteredSongs: StateFlow<List<Song>> = combine(_songs, _searchQuery) { songList, query ->
         if (query.isBlank()) {
@@ -190,6 +229,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun playPlaylist(playlist: Playlist, startSong: Song? = null) {
+        val songs = playlist.songs
+        if (songs.isNotEmpty()) {
+            val targetSong = startSong ?: songs.first()
+            playSong(targetSong, songs)
+        }
+    }
+
     fun playRandom() {
         val all = _songs.value
         if (all.isNotEmpty()) {
@@ -293,6 +340,64 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun selectArtist(artist: Artist?) {
         _selectedArtist.value = artist
     }
+
+    // ─── Playlist Actions ─────────────────────────────────────────────────────────
+
+    fun selectPlaylist(playlist: Playlist?) {
+        _selectedPlaylist.value = playlist
+    }
+
+    fun setShowCreatePlaylistDialog(show: Boolean) {
+        _showCreatePlaylistDialog.value = show
+    }
+
+    fun setSongPendingAddToPlaylist(song: Song?) {
+        _songPendingAddToPlaylist.value = song
+    }
+
+    fun setPlaylistPendingRename(playlist: Playlist?) {
+        _playlistPendingRename.value = playlist
+    }
+
+    fun createPlaylist(name: String) {
+        if (name.isBlank()) return
+        playlistRepository.createPlaylist(name)
+        _rawPlaylists.value = playlistRepository.getPlaylists()
+    }
+
+    fun deletePlaylist(id: String) {
+        playlistRepository.deletePlaylist(id)
+        _rawPlaylists.value = playlistRepository.getPlaylists()
+        if (_selectedPlaylist.value?.id == id) _selectedPlaylist.value = null
+    }
+
+    fun renamePlaylist(id: String, newName: String) {
+        if (newName.isBlank()) return
+        playlistRepository.renamePlaylist(id, newName)
+        _rawPlaylists.value = playlistRepository.getPlaylists()
+        // Update selectedPlaylist if it's the renamed one
+        _selectedPlaylist.value?.let { sel ->
+            if (sel.id == id) _selectedPlaylist.value = sel.copy(name = newName.trim())
+        }
+    }
+
+    fun addSongToPlaylist(playlistId: String, songId: Long) {
+        playlistRepository.addSongToPlaylist(playlistId, songId)
+        _rawPlaylists.value = playlistRepository.getPlaylists()
+    }
+
+    fun removeSongFromPlaylist(playlistId: String, songId: Long) {
+        playlistRepository.removeSongFromPlaylist(playlistId, songId)
+        _rawPlaylists.value = playlistRepository.getPlaylists()
+        // Refresh selected playlist
+        _selectedPlaylist.value?.let { sel ->
+            if (sel.id == playlistId) {
+                _selectedPlaylist.value = sel.copy(songIds = sel.songIds.filter { it != songId })
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
 
     private fun addToRecentHistory(songId: Long) {
         val current = _recentSongIds.value.toMutableList()

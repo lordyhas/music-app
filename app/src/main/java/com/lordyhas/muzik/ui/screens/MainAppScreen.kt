@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -40,6 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
+import com.lordyhas.muzik.ui.components.AddToPlaylistSheet
+import com.lordyhas.muzik.ui.components.CreatePlaylistDialog
 import com.lordyhas.muzik.ui.components.MiniPlayer
 import com.lordyhas.muzik.ui.components.NowPlayingScreen
 import com.lordyhas.muzik.ui.components.PermissionRequestView
@@ -55,7 +58,8 @@ enum class NavigationTab(val title: String, val icon: ImageVector) {
     HOME("Accueil", Icons.Default.Home),
     TRACKS("Titres", Icons.Default.MusicNote),
     ALBUMS("Albums", Icons.Default.Album),
-    ARTISTS("Artistes", Icons.Default.Person)
+    ARTISTS("Artistes", Icons.Default.Person),
+    PLAYLISTS("Playlists", Icons.Default.PlaylistPlay)
 }
 
 @UnstableApi
@@ -77,6 +81,9 @@ fun MainAppScreen(
     val currentQueue by viewModel.currentQueue.collectAsState()
     val currentQueueIndex by viewModel.currentQueueIndex.collectAsState()
     val selectedSongForDetails by viewModel.selectedSongForDetails.collectAsState()
+    val songPendingAddToPlaylist by viewModel.songPendingAddToPlaylist.collectAsState()
+    val playlists by viewModel.playlists.collectAsState()
+    val showCreatePlaylistDialog by viewModel.showCreatePlaylistDialog.collectAsState()
 
     var selectedTab by remember { mutableStateOf(NavigationTab.HOME) }
 
@@ -160,6 +167,7 @@ fun MainAppScreen(
                         NavigationTab.TRACKS -> TracksScreen(viewModel = viewModel)
                         NavigationTab.ALBUMS -> AlbumsScreen(viewModel = viewModel)
                         NavigationTab.ARTISTS -> ArtistsScreen(viewModel = viewModel)
+                        NavigationTab.PLAYLISTS -> PlaylistsScreen(viewModel = viewModel)
                     }
                 }
             }
@@ -206,6 +214,46 @@ fun MainAppScreen(
             com.lordyhas.muzik.ui.components.SongDetailsDialog(
                 song = song,
                 onDismiss = { viewModel.selectSongForDetails(null) }
+            )
+        }
+
+        // ─── Add To Playlist Sheet ─────────────────────────────────────────────
+        songPendingAddToPlaylist?.let { song ->
+            AddToPlaylistSheet(
+                song = song,
+                playlists = playlists,
+                onAddToPlaylist = { playlist ->
+                    viewModel.addSongToPlaylist(playlist.id, song.id)
+                    viewModel.setSongPendingAddToPlaylist(null)
+                },
+                onCreateNew = {
+                    // Dismiss the sheet and show create dialog; song is kept pending
+                    viewModel.setShowCreatePlaylistDialog(true)
+                },
+                onDismiss = { viewModel.setSongPendingAddToPlaylist(null) }
+            )
+        }
+
+        // ─── Create Playlist Dialog (global, triggered from AddToPlaylistSheet) ─
+        if (showCreatePlaylistDialog && songPendingAddToPlaylist != null) {
+            CreatePlaylistDialog(
+                title = "Nouvelle playlist",
+                initialName = "",
+                onConfirm = { name ->
+                    val created = viewModel.playlists.value
+                    viewModel.createPlaylist(name)
+                    // After creation, automatically add the pending song
+                    val newPlaylist = viewModel.playlists.value.firstOrNull { p ->
+                        p.name == name.trim() && p !in created
+                    }
+                    newPlaylist?.let { viewModel.addSongToPlaylist(it.id, songPendingAddToPlaylist!!.id) }
+                    viewModel.setShowCreatePlaylistDialog(false)
+                    viewModel.setSongPendingAddToPlaylist(null)
+                },
+                onDismiss = {
+                    viewModel.setShowCreatePlaylistDialog(false)
+                    // Don't clear pending song so sheet can be reshown
+                }
             )
         }
     }

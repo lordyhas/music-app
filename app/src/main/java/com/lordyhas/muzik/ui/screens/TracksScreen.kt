@@ -228,6 +228,7 @@ fun TracksScreen(
                         onClick = { viewModel.playSong(song) },
                         onPlayNext = { viewModel.playNext(song) },
                         onAddToQueue = { viewModel.addToQueue(song) },
+                        onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
                         onGoToArtist = { viewModel.navigateToArtist(song.artist) },
                         onGoToAlbum = { viewModel.navigateToAlbum(song.album) },
                         onShowDetails = { viewModel.selectSongForDetails(song) }

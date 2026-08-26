@@ -222,6 +222,7 @@ fun AlbumsScreen(
             },
             onPlayNext = { song -> viewModel.playNext(song) },
             onAddToQueue = { song -> viewModel.addToQueue(song) },
+            onAddToPlaylist = { song -> viewModel.setSongPendingAddToPlaylist(song) },
             onGoToArtist = { artistName ->
                 viewModel.selectAlbum(null)
                 viewModel.navigateToArtist(artistName)

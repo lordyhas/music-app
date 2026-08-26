@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
@@ -62,6 +63,8 @@ fun SongItem(
     onClick: () -> Unit,
     onPlayNext: (() -> Unit)? = null,
     onAddToQueue: (() -> Unit)? = null,
+    onAddToPlaylist: (() -> Unit)? = null,
+    onRemoveFromPlaylist: (() -> Unit)? = null,
     onGoToArtist: (() -> Unit)? = null,
     onGoToAlbum: (() -> Unit)? = null,
     onShowDetails: (() -> Unit)? = null,
@@ -221,6 +224,24 @@ fun SongItem(
                     )
                 }
 
+                if (onAddToPlaylist != null) {
+                    DropdownMenuItem(
+                        text = { Text("Ajouter à une playlist", color = TextPrimary, fontSize = 14.sp) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.QueueMusic,
+                                contentDescription = null,
+                                tint = AccentPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = {
+                            isMenuExpanded = false
+                            onAddToPlaylist()
+                        }
+                    )
+                }
+
                 if (onGoToArtist != null) {
                     DropdownMenuItem(
                         text = { Text("Aller à l'artiste", color = TextPrimary, fontSize = 14.sp) },
@@ -253,6 +274,24 @@ fun SongItem(
                         onClick = {
                             isMenuExpanded = false
                             onGoToAlbum()
+                        }
+                    )
+                }
+
+                if (onRemoveFromPlaylist != null) {
+                    DropdownMenuItem(
+                        text = { Text("Retirer de la playlist", color = TextPrimary, fontSize = 14.sp) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = Color(0xFFFF5252),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = {
+                            isMenuExpanded = false
+                            onRemoveFromPlaylist()
                         }
                     )
                 }
