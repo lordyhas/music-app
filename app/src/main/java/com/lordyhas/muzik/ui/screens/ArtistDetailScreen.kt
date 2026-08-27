@@ -63,6 +63,7 @@ import com.lordyhas.muzik.ui.theme.TextPrimary
 import com.lordyhas.muzik.ui.theme.TextSecondary
 import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
 
+@androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(UnstableApi::class)
 @Composable
 fun ArtistDetailScreen(

@@ -50,7 +50,6 @@ import com.lordyhas.muzik.ui.components.CreatePlaylistDialog
 import com.lordyhas.muzik.ui.components.MiniPlayer
 import com.lordyhas.muzik.ui.components.NowPlayingScreen
 import com.lordyhas.muzik.ui.components.PermissionRequestView
-import com.lordyhas.muzik.ui.components.QueueSheet
 import com.lordyhas.muzik.ui.components.SongDetailsDialog
 import com.lordyhas.muzik.ui.theme.AccentPrimary
 import com.lordyhas.muzik.ui.theme.BackgroundDark
@@ -82,7 +81,6 @@ fun MainAppScreen(
     val isShuffle by viewModel.isShuffle.collectAsState()
     val repeatMode by viewModel.repeatMode.collectAsState()
     val showNowPlaying by viewModel.showNowPlaying.collectAsState()
-    val showQueue by viewModel.showQueue.collectAsState()
     val currentQueue by viewModel.currentQueue.collectAsState()
     val currentQueueIndex by viewModel.currentQueueIndex.collectAsState()
     val selectedSongForDetails by viewModel.selectedSongForDetails.collectAsState()
@@ -127,11 +125,6 @@ fun MainAppScreen(
                 ) {
                     // Mini Player anchored above navigation bar or bottom insets
                     if (currentSong != null) {
-                        val miniPlayerModifier = if (isTopLevelRoute) {
-                            Modifier
-                        } else {
-                            Modifier.navigationBarsPadding()
-                        }
                         MiniPlayer(
                             song = currentSong,
                             isPlaying = isPlaying,
@@ -139,14 +132,12 @@ fun MainAppScreen(
                             duration = duration,
                             onTogglePlayPause = { viewModel.togglePlayPause() },
                             onSkipNext = { viewModel.skipNext() },
-                            onClick = { viewModel.setShowNowPlaying(true) },
-                            modifier = miniPlayerModifier
+                            onClick = { viewModel.setShowNowPlaying(true) }
                         )
                     }
 
-                    // Bottom Navigation Bar (visible only on top-level tabs)
-                    if (isTopLevelRoute) {
-                        NavigationBar(
+                    // Bottom Navigation Bar (always visible)
+                    NavigationBar(
                             containerColor = SurfaceDark,
                             tonalElevation = 8.dp,
                             modifier = Modifier
@@ -189,7 +180,6 @@ fun MainAppScreen(
                                         indicatorColor = SurfaceCard
                                     )
                                 )
-                            }
                         }
                     }
                 }
@@ -306,26 +296,17 @@ fun MainAppScreen(
                 duration = duration,
                 isShuffle = isShuffle,
                 repeatMode = repeatMode,
+                queue = currentQueue,
+                currentIndex = currentQueueIndex,
                 onTogglePlayPause = { viewModel.togglePlayPause() },
                 onSeekTo = { viewModel.seekTo(it) },
                 onSkipNext = { viewModel.skipNext() },
                 onSkipPrevious = { viewModel.skipPrevious() },
                 onToggleShuffle = { viewModel.toggleShuffle() },
                 onToggleRepeat = { viewModel.toggleRepeat() },
-                onDismiss = { viewModel.setShowNowPlaying(false) },
-                onOpenQueue = { viewModel.setShowQueue(true) }
-            )
-        }
-
-        // Queue Bottom Sheet
-        if (showQueue) {
-            QueueSheet(
-                queue = currentQueue,
-                currentIndex = currentQueueIndex,
-                isPlaying = isPlaying,
                 onPlayIndex = { viewModel.playQueueIndex(it) },
                 onRemoveIndex = { viewModel.removeQueueItem(it) },
-                onDismiss = { viewModel.setShowQueue(false) }
+                onDismiss = { viewModel.setShowNowPlaying(false) }
             )
         }
 
