@@ -69,7 +69,7 @@ fun MiniPlayer(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(top=0.dp, bottom = 4.dp, start = 4.dp, end = 4.dp)
             .shadow(16.dp, RoundedCornerShape(16.dp), spotColor = AccentPrimary.copy(alpha = 0.25f))
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),

@@ -33,6 +33,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,10 +54,13 @@ import com.lordyhas.muzik.ui.components.NowPlayingScreen
 import com.lordyhas.muzik.ui.components.PermissionRequestView
 import com.lordyhas.muzik.ui.components.SongDetailsDialog
 import com.lordyhas.muzik.ui.theme.AccentPrimary
+import com.lordyhas.muzik.ui.theme.AccentSecondary
 import com.lordyhas.muzik.ui.theme.BackgroundDark
 import com.lordyhas.muzik.ui.theme.SurfaceCard
 import com.lordyhas.muzik.ui.theme.SurfaceDark
+import com.lordyhas.muzik.ui.theme.SurfaceElevated
 import com.lordyhas.muzik.ui.theme.TextMuted
+import com.lordyhas.muzik.ui.theme.TrackBackground
 import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
 
 enum class NavigationTab(val route: String, val title: String, val icon: ImageVector) {
@@ -114,14 +119,17 @@ fun MainAppScreen(
         navController.navigate("playlist/$encoded")
     }
 
-    Box(modifier = modifier.fillMaxSize().background(BackgroundDark)) {
+    Box(modifier = modifier.fillMaxSize().background(Color.Transparent)) {
         Scaffold(
             containerColor = BackgroundDark,
             bottomBar = {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(BackgroundDark)
+                        .background(
+                            Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, SurfaceDark)
+                        ))
                 ) {
                     // Mini Player anchored above navigation bar or bottom insets
                     if (currentSong != null) {

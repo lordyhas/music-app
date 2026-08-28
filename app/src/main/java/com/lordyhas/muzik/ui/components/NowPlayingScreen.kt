@@ -380,6 +380,20 @@ fun NowPlayingScreen(
                                 )
                             }
                         }
+
+                        Column( horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "file d'attente",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                                //modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            Icon(
+                                Icons.Default.KeyboardArrowDown, "Swip",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(30.dp).padding(bottom = 16.dp)
+                            )
+                        }
                     }
                 }
 
@@ -485,7 +499,9 @@ fun NowPlayingScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Box(modifier = Modifier.width(8.dp))
+
+                            //Spacer(modifier = Modifier.width(8.dp))
 
                             // Next
                             IconButton(
@@ -505,7 +521,7 @@ fun NowPlayingScreen(
                             Spacer(modifier = Modifier.width(4.dp))
 
                             // Dismiss
-                            IconButton(
+                            /*IconButton(
                                 onClick = onDismiss,
                                 modifier = Modifier
                                     .size(40.dp)
@@ -517,7 +533,7 @@ fun NowPlayingScreen(
                                     tint = TextSecondary,
                                     modifier = Modifier.size(22.dp)
                                 )
-                            }
+                            }*/
                         }
 
                         // ── Queue Section Header ─────────────────────────────
