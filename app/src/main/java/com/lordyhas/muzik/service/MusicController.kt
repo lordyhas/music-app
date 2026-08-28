@@ -26,6 +26,9 @@ class MusicController(private val context: Context) {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? = null
 
+    // Tracks how many songs the user has manually queued after the current song (Spotify-style FIFO)
+    private var userQueueCount = 0
+
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
 
@@ -60,6 +63,7 @@ class MusicController(private val context: Context) {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             _currentMediaItem.value = mediaItem
             _currentMediaItemIndex.value = mediaController?.currentMediaItemIndex ?: 0
+            userQueueCount = 0 // Reset: user queue is relative to the current song
             updateDuration()
             updatePosition()
         }
@@ -139,28 +143,6 @@ class MusicController(private val context: Context) {
         controller.play()
     }
 
-    fun playNext(song: Song) {
-        val controller = mediaController ?: return
-        val mediaItem = song.toMediaItem()
-
-        if (controller.mediaItemCount == 0 || _currentQueue.value.isEmpty()) {
-            playSongList(listOf(song), 0)
-            return
-        }
-
-        val currentIndex = controller.currentMediaItemIndex
-        val insertIndex = (currentIndex + 1).coerceAtMost(controller.mediaItemCount)
-        controller.addMediaItem(insertIndex, mediaItem)
-
-        val updatedQueue = _currentQueue.value.toMutableList()
-        if (insertIndex <= updatedQueue.size) {
-            updatedQueue.add(insertIndex, song)
-        } else {
-            updatedQueue.add(song)
-        }
-        _currentQueue.value = updatedQueue
-    }
-
     fun addToQueue(song: Song) {
         val controller = mediaController ?: return
         val mediaItem = song.toMediaItem()
@@ -170,9 +152,18 @@ class MusicController(private val context: Context) {
             return
         }
 
-        controller.addMediaItem(mediaItem)
+        // Spotify-style: insert after the last user-queued song (FIFO order)
+        val currentIndex = controller.currentMediaItemIndex
+        val insertIndex = (currentIndex + 1 + userQueueCount).coerceAtMost(controller.mediaItemCount)
+        controller.addMediaItem(insertIndex, mediaItem)
+        userQueueCount++
+
         val updatedQueue = _currentQueue.value.toMutableList()
-        updatedQueue.add(song)
+        if (insertIndex <= updatedQueue.size) {
+            updatedQueue.add(insertIndex, song)
+        } else {
+            updatedQueue.add(song)
+        }
         _currentQueue.value = updatedQueue
     }
 

@@ -318,7 +318,6 @@ fun AlbumDetailScreen(
                     isSelected = isSelected,
                     isPlaying = isPlaying && isSelected,
                     onClick = { viewModel.playAlbum(album, song) },
-                    onPlayNext = { viewModel.playNext(song) },
                     onAddToQueue = { viewModel.addToQueue(song) },
                     onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
                     onGoToArtist = { onGoToArtist(song.artist) },

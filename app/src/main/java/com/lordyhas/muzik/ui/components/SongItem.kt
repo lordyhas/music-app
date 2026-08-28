@@ -20,14 +20,12 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -61,7 +59,6 @@ fun SongItem(
     isSelected: Boolean,
     isPlaying: Boolean,
     onClick: () -> Unit,
-    onPlayNext: (() -> Unit)? = null,
     onAddToQueue: (() -> Unit)? = null,
     onAddToPlaylist: (() -> Unit)? = null,
     onRemoveFromPlaylist: (() -> Unit)? = null,
@@ -187,31 +184,12 @@ fun SongItem(
                     .background(SurfaceElevated)
                     .clip(RoundedCornerShape(12.dp))
             ) {
-                if (onPlayNext != null) {
+                if (onAddToQueue != null) {
                     DropdownMenuItem(
-                        text = { Text("Lire juste après", color = TextPrimary, fontSize = 14.sp) },
+                        text = { Text("Ajouter à la file d'attente", color = TextPrimary, fontSize = 14.sp) },
                         leadingIcon = {
                             Icon(
                                 Icons.Default.QueueMusic,
-                                contentDescription = null,
-                                tint = AccentPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onPlayNext()
-                        },
-                        colors = MenuDefaults.itemColors()
-                    )
-                }
-
-                if (onAddToQueue != null) {
-                    DropdownMenuItem(
-                        text = { Text("Ajouter à la file", color = TextPrimary, fontSize = 14.sp) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.PlaylistAdd,
                                 contentDescription = null,
                                 tint = AccentPrimary,
                                 modifier = Modifier.size(20.dp)
