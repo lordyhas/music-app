@@ -59,17 +59,33 @@ class MusicController(private val context: Context) {
     private val _currentMediaItemIndex = MutableStateFlow(0)
     val currentMediaItemIndex: StateFlow<Int> = _currentMediaItemIndex.asStateFlow()
 
+    private fun clampUserQueueCount() {
+        val controller = mediaController ?: return
+        val currentIndex = controller.currentMediaItemIndex
+        val maxAvailable = (controller.mediaItemCount - currentIndex - 1).coerceAtLeast(0)
+        userQueueCount = userQueueCount.coerceIn(0, maxAvailable)
+    }
+
     private val playerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             _currentMediaItem.value = mediaItem
-            _currentMediaItemIndex.value = mediaController?.currentMediaItemIndex ?: 0
-            userQueueCount = 0 // Reset: user queue is relative to the current song
+            val oldIndex = _currentMediaItemIndex.value
+            val newIndex = mediaController?.currentMediaItemIndex ?: 0
+            _currentMediaItemIndex.value = newIndex
+
+            val diff = newIndex - oldIndex
+            if (diff != 0) {
+                userQueueCount = (userQueueCount - diff).coerceAtLeast(0)
+            }
+            clampUserQueueCount()
+
             updateDuration()
             updatePosition()
         }
 
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
             _currentMediaItemIndex.value = mediaController?.currentMediaItemIndex ?: 0
+            clampUserQueueCount()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -136,6 +152,7 @@ class MusicController(private val context: Context) {
         val controller = mediaController ?: return
         val mediaItems = songs.map { it.toMediaItem() }
 
+        userQueueCount = 0
         _currentQueue.value = songs
         _currentMediaItemIndex.value = startIndex
         controller.setMediaItems(mediaItems, startIndex, 0L)
@@ -152,6 +169,7 @@ class MusicController(private val context: Context) {
             return
         }
 
+        clampUserQueueCount()
         // Spotify-style: insert after the last user-queued song (FIFO order)
         val currentIndex = controller.currentMediaItemIndex
         val insertIndex = (currentIndex + 1 + userQueueCount).coerceAtMost(controller.mediaItemCount)
@@ -170,12 +188,17 @@ class MusicController(private val context: Context) {
     fun removeQueueItem(index: Int) {
         val controller = mediaController ?: return
         if (index in 0 until controller.mediaItemCount) {
+            val currentIndex = controller.currentMediaItemIndex
+            if (index > currentIndex && index <= currentIndex + userQueueCount) {
+                userQueueCount = (userQueueCount - 1).coerceAtLeast(0)
+            }
             controller.removeMediaItem(index)
             val updatedQueue = _currentQueue.value.toMutableList()
             if (index in updatedQueue.indices) {
                 updatedQueue.removeAt(index)
                 _currentQueue.value = updatedQueue
             }
+            clampUserQueueCount()
         }
     }
 

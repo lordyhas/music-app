@@ -14,7 +14,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-import androidx.media3.common.util.UnstableApi
+import androidx.  media3.common.util.UnstableApi
 import com.lordyhas.muzik.ui.screens.MainAppScreen
 import com.lordyhas.muzik.ui.theme.BackgroundDark
 import com.lordyhas.muzik.ui.theme.MuzikTheme
