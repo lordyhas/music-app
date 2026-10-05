@@ -53,6 +53,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     val currentQueue: StateFlow<List<Song>> = musicController.currentQueue
     val currentQueueIndex: StateFlow<Int> = musicController.currentMediaItemIndex
+    val userQueueCount: StateFlow<Int> = musicController.userQueueCount
+    val userQueue: StateFlow<List<Song>> = musicController.userQueueList
+    val contextQueue: StateFlow<List<Song>> = musicController.contextQueueList
 
     private val _recentSongIds = MutableStateFlow<List<Long>>(loadRecentSongIds())
 

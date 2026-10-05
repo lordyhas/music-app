@@ -92,6 +92,7 @@ fun NowPlayingScreen(
     repeatMode: Int,
     queue: List<Song>,
     currentIndex: Int,
+    userQueueCount: Int,
     onTogglePlayPause: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onSkipNext: () -> Unit,
@@ -536,50 +537,6 @@ fun NowPlayingScreen(
                             }*/
                         }
 
-                        // ── Queue Section Header ─────────────────────────────
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 12.dp)
-                        ) {
-                            Text(
-                                text = "EN COURS DE LECTURE DEPUIS",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    letterSpacing = 1.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = AccentPrimary
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = song.album.ifEmpty { "Bibliothèque" },
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 20.sp
-                                    ),
-                                    color = TextPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                Text(
-                                    text = "${queue.size} titre${if (queue.size > 1) "s" else ""}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = TextSecondary
-                                )
-                            }
-                        }
-
                         // ── Queue Track List ─────────────────────────────────
                         if (queue.isEmpty()) {
                             Box(
@@ -601,24 +558,91 @@ fun NowPlayingScreen(
                                     .weight(1f),
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 48.dp)
                             ) {
-                                itemsIndexed(
-                                    queue,
-                                    key = { idx, item -> "${idx}_${item.id}" }
-                                ) { index, queueSong ->
-                                    val isCurrent = index == currentIndex
-                                    QueueSongRow(
-                                        song = queueSong,
-                                        isCurrent = isCurrent,
-                                        isPlaying = isPlaying && isCurrent,
-                                        onClick = { onPlayIndex(index) },
-                                        onRemove = if (!isCurrent) {
-                                            { onRemoveIndex(index) }
-                                        } else null,
-                                        modifier = Modifier.padding(
-                                            horizontal = 16.dp,
-                                            vertical = 3.dp
+                                // 1. En cours de lecture
+                                if (currentIndex in queue.indices) {
+                                    item {
+                                        Text(
+                                            text = "EN COURS DE LECTURE",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                letterSpacing = 1.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = AccentPrimary,
+                                            modifier = Modifier.padding(horizontal = 20.dp).padding(top = 12.dp, bottom = 8.dp)
                                         )
-                                    )
+                                        QueueSongRow(
+                                            song = queue[currentIndex],
+                                            isCurrent = true,
+                                            isPlaying = isPlaying,
+                                            onClick = { onPlayIndex(currentIndex) },
+                                            onRemove = null,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+
+                                // 2. File d'attente utilisateur
+                                if (userQueueCount > 0 && currentIndex + 1 < queue.size) {
+                                    item {
+                                        Text(
+                                            text = "FILE D'ATTENTE",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                letterSpacing = 1.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = TextPrimary,
+                                            modifier = Modifier.padding(horizontal = 20.dp).padding(top = 24.dp, bottom = 8.dp)
+                                        )
+                                    }
+                                    
+                                    val uqStart = currentIndex + 1
+                                    val uqEnd = (uqStart + userQueueCount).coerceAtMost(queue.size)
+                                    
+                                    items(
+                                        count = uqEnd - uqStart,
+                                        key = { i -> "${uqStart + i}_${queue[uqStart + i].id}" }
+                                    ) { i ->
+                                        val absoluteIndex = uqStart + i
+                                        QueueSongRow(
+                                            song = queue[absoluteIndex],
+                                            isCurrent = false,
+                                            isPlaying = false,
+                                            onClick = { onPlayIndex(absoluteIndex) },
+                                            onRemove = { onRemoveIndex(absoluteIndex) },
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+                                
+                                // 3. À suivre (Reste de l'album/playlist)
+                                val contextStart = currentIndex + 1 + userQueueCount
+                                if (contextStart < queue.size) {
+                                    item {
+                                        Text(
+                                            text = "À SUIVRE : " + (song?.album?.ifEmpty { "Bibliothèque" } ?: "Bibliothèque").uppercase(Locale.getDefault()),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                letterSpacing = 1.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = TextSecondary,
+                                            modifier = Modifier.padding(horizontal = 20.dp).padding(top = 24.dp, bottom = 8.dp)
+                                        )
+                                    }
+                                    
+                                    items(
+                                        count = queue.size - contextStart,
+                                        key = { i -> "${contextStart + i}_${queue[contextStart + i].id}" }
+                                    ) { i ->
+                                        val absoluteIndex = contextStart + i
+                                        QueueSongRow(
+                                            song = queue[absoluteIndex],
+                                            isCurrent = false,
+                                            isPlaying = false,
+                                            onClick = { onPlayIndex(absoluteIndex) },
+                                            onRemove = { onRemoveIndex(absoluteIndex) },
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

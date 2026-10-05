@@ -27,7 +27,7 @@ class MusicController(private val context: Context) {
     private var mediaController: MediaController? = null
 
     // Tracks how many songs the user has manually queued after the current song (Spotify-style FIFO)
-    private var userQueueCount = 0
+
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
@@ -59,11 +59,37 @@ class MusicController(private val context: Context) {
     private val _currentMediaItemIndex = MutableStateFlow(0)
     val currentMediaItemIndex: StateFlow<Int> = _currentMediaItemIndex.asStateFlow()
 
+    private val _userQueueCount = MutableStateFlow(0)
+    val userQueueCount: StateFlow<Int> = _userQueueCount.asStateFlow()
+
+    private val _userQueueList = MutableStateFlow<List<Song>>(emptyList())
+    val userQueueList: StateFlow<List<Song>> = _userQueueList.asStateFlow()
+
+    private val _contextQueueList = MutableStateFlow<List<Song>>(emptyList())
+    val contextQueueList: StateFlow<List<Song>> = _contextQueueList.asStateFlow()
+
+    private var baseContextQueue: List<Song> = emptyList()
+
+    private fun updateUIQueues() {
+        val fullQueue = _currentQueue.value
+        val idx = _currentMediaItemIndex.value
+
+        if (idx in fullQueue.indices) {
+            val uqStart = idx + 1
+            val uqEnd = (uqStart + _userQueueCount.value).coerceAtMost(fullQueue.size)
+            _userQueueList.value = fullQueue.subList(uqStart, uqEnd)
+            _contextQueueList.value = fullQueue.subList(uqEnd, fullQueue.size)
+        } else {
+            _userQueueList.value = emptyList()
+            _contextQueueList.value = emptyList()
+        }
+    }
+
     private fun clampUserQueueCount() {
         val controller = mediaController ?: return
         val currentIndex = controller.currentMediaItemIndex
         val maxAvailable = (controller.mediaItemCount - currentIndex - 1).coerceAtLeast(0)
-        userQueueCount = userQueueCount.coerceIn(0, maxAvailable)
+        _userQueueCount.value = _userQueueCount.value.coerceIn(0, maxAvailable)
     }
 
     private val playerListener = object : Player.Listener {
@@ -75,9 +101,10 @@ class MusicController(private val context: Context) {
 
             val diff = newIndex - oldIndex
             if (diff != 0) {
-                userQueueCount = (userQueueCount - diff).coerceAtLeast(0)
+                _userQueueCount.value = (_userQueueCount.value - diff).coerceAtLeast(0)
             }
             clampUserQueueCount()
+            updateUIQueues()
 
             updateDuration()
             updatePosition()
@@ -86,6 +113,7 @@ class MusicController(private val context: Context) {
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
             _currentMediaItemIndex.value = mediaController?.currentMediaItemIndex ?: 0
             clampUserQueueCount()
+            updateUIQueues()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -104,7 +132,7 @@ class MusicController(private val context: Context) {
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-            _isShuffle.value = shuffleModeEnabled
+            // Ignored: we use custom physical shuffle logic in toggleShuffle()
         }
 
         override fun onRepeatModeChanged(repeatMode: Int) {
@@ -150,11 +178,24 @@ class MusicController(private val context: Context) {
 
     fun playSongList(songs: List<Song>, startIndex: Int) {
         val controller = mediaController ?: return
-        val mediaItems = songs.map { it.toMediaItem() }
+        baseContextQueue = songs
+        _userQueueCount.value = 0
 
-        userQueueCount = 0
-        _currentQueue.value = songs
+        // Handle shuffle for playSongList: Shuffle the remaining context only.
+        val playQueue = if (_isShuffle.value) {
+            val before = songs.subList(0, startIndex + 1)
+            val after = songs.subList(startIndex + 1, songs.size).shuffled()
+            before + after
+        } else {
+            songs
+        }
+
+        val mediaItems = playQueue.map { it.toMediaItem() }
+
+        _currentQueue.value = playQueue
         _currentMediaItemIndex.value = startIndex
+        updateUIQueues()
+        
         controller.setMediaItems(mediaItems, startIndex, 0L)
         controller.prepare()
         controller.play()
@@ -172,9 +213,9 @@ class MusicController(private val context: Context) {
         clampUserQueueCount()
         // Spotify-style: insert after the last user-queued song (FIFO order)
         val currentIndex = controller.currentMediaItemIndex
-        val insertIndex = (currentIndex + 1 + userQueueCount).coerceAtMost(controller.mediaItemCount)
+        val insertIndex = (currentIndex + 1 + _userQueueCount.value).coerceAtMost(controller.mediaItemCount)
         controller.addMediaItem(insertIndex, mediaItem)
-        userQueueCount++
+        _userQueueCount.value++
 
         val updatedQueue = _currentQueue.value.toMutableList()
         if (insertIndex <= updatedQueue.size) {
@@ -183,14 +224,15 @@ class MusicController(private val context: Context) {
             updatedQueue.add(song)
         }
         _currentQueue.value = updatedQueue
+        updateUIQueues()
     }
 
     fun removeQueueItem(index: Int) {
         val controller = mediaController ?: return
         if (index in 0 until controller.mediaItemCount) {
             val currentIndex = controller.currentMediaItemIndex
-            if (index > currentIndex && index <= currentIndex + userQueueCount) {
-                userQueueCount = (userQueueCount - 1).coerceAtLeast(0)
+            if (index > currentIndex && index <= currentIndex + _userQueueCount.value) {
+                _userQueueCount.value = (_userQueueCount.value - 1).coerceAtLeast(0)
             }
             controller.removeMediaItem(index)
             val updatedQueue = _currentQueue.value.toMutableList()
@@ -199,6 +241,7 @@ class MusicController(private val context: Context) {
                 _currentQueue.value = updatedQueue
             }
             clampUserQueueCount()
+            updateUIQueues()
         }
     }
 
@@ -210,6 +253,7 @@ class MusicController(private val context: Context) {
             if (!controller.isPlaying) {
                 controller.play()
             }
+            updateUIQueues()
         }
     }
 
@@ -223,6 +267,7 @@ class MusicController(private val context: Context) {
                 updatedQueue.add(toIndex, item)
                 _currentQueue.value = updatedQueue
             }
+            updateUIQueues()
         }
     }
 
@@ -264,9 +309,42 @@ class MusicController(private val context: Context) {
 
     fun toggleShuffle() {
         val controller = mediaController ?: return
-        val newShuffle = !controller.shuffleModeEnabled
-        controller.shuffleModeEnabled = newShuffle
+        val newShuffle = !_isShuffle.value
         _isShuffle.value = newShuffle
+
+        // Native shuffle is disabled because we physically shuffle the context list 
+        // to protect the user queue order (Spotify logic).
+        controller.shuffleModeEnabled = false
+
+        val currentIndex = controller.currentMediaItemIndex
+        val safeIndex = (currentIndex + 1 + _userQueueCount.value).coerceAtMost(controller.mediaItemCount)
+
+        val currentFullQueue = _currentQueue.value.toMutableList()
+
+        if (newShuffle) {
+            if (safeIndex < currentFullQueue.size) {
+                val contextRemaining = currentFullQueue.subList(safeIndex, currentFullQueue.size).shuffled()
+                for (i in contextRemaining.indices) {
+                    currentFullQueue[safeIndex + i] = contextRemaining[i]
+                }
+            }
+        } else {
+            if (safeIndex < currentFullQueue.size) {
+                val remainingIds = currentFullQueue.subList(safeIndex, currentFullQueue.size).map { it.id }.toSet()
+                val restoredContext = baseContextQueue.filter { it.id in remainingIds }
+                for (i in restoredContext.indices) {
+                    currentFullQueue[safeIndex + i] = restoredContext[i]
+                }
+            }
+        }
+
+        _currentQueue.value = currentFullQueue
+        updateUIQueues()
+
+        if (safeIndex < currentFullQueue.size) {
+            val newMediaItems = currentFullQueue.subList(safeIndex, currentFullQueue.size).map { it.toMediaItem() }
+            controller.replaceMediaItems(safeIndex, controller.mediaItemCount, newMediaItems)
+        }
     }
 
     fun toggleRepeat() {
