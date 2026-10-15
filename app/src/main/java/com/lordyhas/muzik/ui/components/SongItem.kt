@@ -101,7 +101,7 @@ fun SongItem(
                         .data(song.albumArtUri)
                         .crossfade(true)
                         .build(),
-                    contentDescription = "Pochette d'album",
+                    contentDescription = "Album Artwork",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.matchParentSize()
                 )

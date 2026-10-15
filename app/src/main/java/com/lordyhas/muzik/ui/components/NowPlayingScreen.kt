@@ -382,18 +382,26 @@ fun NowPlayingScreen(
                             }
                         }
 
-                        Column( horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            modifier = Modifier.clickable {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(1)
+                                }
+                            },
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
                             Text(
-                                text = "file d'attente",
-                                style = MaterialTheme.typography.labelSmall,
+                                text = "File d'attente",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = TextSecondary,
                                 //modifier = Modifier.padding(bottom = 12.dp)
                             )
                             Icon(
-                                Icons.Default.KeyboardArrowDown, "Swip",
+                                Icons.Default.KeyboardArrowDown, "Swipe",
                                 tint = TextSecondary,
-                                modifier = Modifier.size(30.dp).padding(bottom = 16.dp)
+                                modifier = Modifier.size(40.dp).padding(bottom = 16.dp)
                             )
+                            Box(modifier = Modifier.width(8.dp))
                         }
                     }
                 }
@@ -494,7 +502,7 @@ fun NowPlayingScreen(
                             ) {
                                 Icon(
                                     if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    if (isPlaying) "Pause" else "Lecture",
+                                    if (isPlaying) "Pause" else "Play",
                                     tint = AccentPrimary,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -502,7 +510,7 @@ fun NowPlayingScreen(
 
                             Box(modifier = Modifier.width(8.dp))
 
-                            //Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             // Next
                             IconButton(
@@ -513,7 +521,7 @@ fun NowPlayingScreen(
                                     .background(SurfaceCard)
                             ) {
                                 Icon(
-                                    Icons.Default.SkipNext, "Suivant",
+                                    Icons.Default.SkipNext, "next",
                                     tint = TextPrimary,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -546,7 +554,7 @@ fun NowPlayingScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "La file d'attente est vide",
+                                    text = "Queue is empty",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = TextMuted
                                 )
