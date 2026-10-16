@@ -1,8 +1,11 @@
 package com.lordyhas.muzik.ui.screens
 
+import android.app.Activity
+import android.widget.Toast
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,7 +35,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -97,12 +104,64 @@ fun MainAppScreen(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    val context = LocalContext.current
+    var backPressedTime by remember { mutableLongStateOf(0L) }
+
+    fun safePopBack() {
+        if (!navController.popBackStack()) {
+            navController.navigate(NavigationTab.HOME.route) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
     if (!isPermissionGranted) {
         PermissionRequestView(onRequestPermission = onRequestPermissions)
         return
     }
 
     val isTopLevelRoute = NavigationTab.values().any { it.route == currentRoute }
+
+    // Intercept back for overlays: AddToPlaylistSheet & SongDetailsDialog
+    BackHandler(enabled = songPendingAddToPlaylist != null && !showCreatePlaylistDialog) {
+        viewModel.setSongPendingAddToPlaylist(null)
+    }
+
+    BackHandler(enabled = selectedSongForDetails != null) {
+        viewModel.selectSongForDetails(null)
+    }
+
+    // Intercept back on secondary tabs: go back to Home tab first
+    BackHandler(
+        enabled = isTopLevelRoute && currentRoute != NavigationTab.HOME.route && !showNowPlaying &&
+                selectedSongForDetails == null && songPendingAddToPlaylist == null
+    ) {
+        navController.navigate(NavigationTab.HOME.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    // On Home tab: double back press to exit application safely
+    BackHandler(
+        enabled = currentRoute == NavigationTab.HOME.route && !showNowPlaying &&
+                selectedSongForDetails == null && songPendingAddToPlaylist == null && !showCreatePlaylistDialog
+    ) {
+        val now = System.currentTimeMillis()
+        if (now - backPressedTime < 2000L) {
+            (context as? Activity)?.finish()
+        } else {
+            backPressedTime = now
+            Toast.makeText(context, "Appuyez à nouveau pour quitter", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     fun navigateToAlbum(albumTitle: String) {
         val encoded = URLEncoder.encode(albumTitle, StandardCharsets.UTF_8.toString())
@@ -254,7 +313,7 @@ fun MainAppScreen(
                         AlbumDetailScreen(
                             albumTitle = albumTitle,
                             viewModel = viewModel,
-                            onBackClick = { navController.popBackStack() },
+                            onBackClick = { safePopBack() },
                             onGoToArtist = { name -> navigateToArtist(name) }
                         )
                     }
@@ -268,7 +327,7 @@ fun MainAppScreen(
                         ArtistDetailScreen(
                             artistName = artistName,
                             viewModel = viewModel,
-                            onBackClick = { navController.popBackStack() },
+                            onBackClick = { safePopBack() },
                             onGoToAlbum = { title -> navigateToAlbum(title) }
                         )
                     }
@@ -282,7 +341,7 @@ fun MainAppScreen(
                         PlaylistDetailScreen(
                             playlistId = playlistId,
                             viewModel = viewModel,
-                            onBackClick = { navController.popBackStack() },
+                            onBackClick = { safePopBack() },
                             onGoToArtist = { name -> navigateToArtist(name) },
                             onGoToAlbum = { title -> navigateToAlbum(title) }
                         )

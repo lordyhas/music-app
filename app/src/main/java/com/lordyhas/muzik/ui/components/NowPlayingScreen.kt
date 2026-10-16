@@ -25,10 +25,12 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -108,6 +110,17 @@ fun NowPlayingScreen(
 
     val pagerState = rememberPagerState(pageCount = { 2 })
     val coroutineScope = rememberCoroutineScope()
+
+    // Handle back button / gesture: if on queue page, return to player page; if on player, dismiss now playing
+    BackHandler(enabled = true) {
+        if (pagerState.currentPage > 0) {
+            coroutineScope.launch {
+                pagerState.animateScrollToPage(0)
+            }
+        } else {
+            onDismiss()
+        }
+    }
 
     // Slider drag state
     var isDragging by remember { mutableStateOf(false) }
@@ -527,22 +540,7 @@ fun NowPlayingScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(4.dp))
 
-                            // Dismiss
-                            /*IconButton(
-                                onClick = onDismiss,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(SurfaceCard)
-                            ) {
-                                Icon(
-                                    Icons.Default.KeyboardArrowDown, "Fermer",
-                                    tint = TextSecondary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }*/
                         }
 
                         // ── Queue Track List ─────────────────────────────────

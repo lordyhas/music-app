@@ -1,5 +1,6 @@
 package com.lordyhas.muzik.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -73,6 +74,10 @@ fun PlaylistDetailScreen(
     onGoToAlbum: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    BackHandler(enabled = true) {
+        onBackClick()
+    }
+
     val playlists by viewModel.playlists.collectAsState()
     val playlist: Playlist? = playlists.find { it.id == playlistId }
 
