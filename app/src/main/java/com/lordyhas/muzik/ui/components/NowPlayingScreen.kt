@@ -540,26 +540,7 @@ fun NowPlayingScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(4.dp))
 
-                            // Back to player view
-                            IconButton(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(0)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(SurfaceCard)
-                            ) {
-                                Icon(
-                                    Icons.Default.KeyboardArrowUp, "Retour au lecteur",
-                                    tint = TextSecondary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
                         }
 
                         // ── Queue Track List ─────────────────────────────────
