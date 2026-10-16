@@ -321,7 +321,6 @@ fun PlaylistDetailScreen(
                         isSelected = isSelected,
                         isPlaying = isPlaying && isSelected,
                         onClick = { viewModel.playPlaylist(playlist, song) },
-                        onPlayNext = { viewModel.playNext(song) },
                         onAddToQueue = { viewModel.addToQueue(song) },
                         onRemoveFromPlaylist = { viewModel.removeSongFromPlaylist(playlist.id, song.id) },
                         onGoToArtist = { onGoToArtist(song.artist) },

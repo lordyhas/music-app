@@ -53,6 +53,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     val currentQueue: StateFlow<List<Song>> = musicController.currentQueue
     val currentQueueIndex: StateFlow<Int> = musicController.currentMediaItemIndex
+    val userQueueCount: StateFlow<Int> = musicController.userQueueCount
+    val userQueue: StateFlow<List<Song>> = musicController.userQueueList
+    val contextQueue: StateFlow<List<Song>> = musicController.contextQueueList
 
     private val _recentSongIds = MutableStateFlow<List<Long>>(loadRecentSongIds())
 
@@ -277,7 +280,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun setShowQueue(show: Boolean) { _showQueue.value = show }
     fun selectSongForDetails(song: Song?) { _selectedSongForDetails.value = song }
 
-    fun playNext(song: Song) { musicController.playNext(song) }
     fun addToQueue(song: Song) { musicController.addToQueue(song) }
     fun removeQueueItem(index: Int) { musicController.removeQueueItem(index) }
     fun playQueueIndex(index: Int) { musicController.playQueueIndex(index) }

@@ -303,7 +303,6 @@ fun ArtistDetailScreen(
                     isSelected = isSelected,
                     isPlaying = isPlaying && isSelected,
                     onClick = { viewModel.playArtist(artist, song) },
-                    onPlayNext = { viewModel.playNext(song) },
                     onAddToQueue = { viewModel.addToQueue(song) },
                     onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
                     onGoToAlbum = { onGoToAlbum(song.album) },

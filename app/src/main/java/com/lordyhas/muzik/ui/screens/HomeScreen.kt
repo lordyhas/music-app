@@ -452,6 +452,13 @@ private fun RecentSongCard(
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
+            text = "Song",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+            color = TextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
             text = song.title,
             style = MaterialTheme.typography.bodySmall.copy(
                 fontWeight = FontWeight.SemiBold,

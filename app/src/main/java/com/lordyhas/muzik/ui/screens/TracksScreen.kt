@@ -228,7 +228,6 @@ fun TracksScreen(
                         isSelected = isSelected,
                         isPlaying = isPlaying && isSelected,
                         onClick = { viewModel.playSong(song) },
-                        onPlayNext = { viewModel.playNext(song) },
                         onAddToQueue = { viewModel.addToQueue(song) },
                         onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
                         onGoToArtist = { onGoToArtist(song.artist) },
