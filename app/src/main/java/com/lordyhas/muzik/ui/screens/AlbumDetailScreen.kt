@@ -1,5 +1,6 @@
 package com.lordyhas.muzik.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -73,6 +74,10 @@ fun AlbumDetailScreen(
     onGoToArtist: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    BackHandler(enabled = true) {
+        onBackClick()
+    }
+
     val albums by viewModel.albums.collectAsState()
     val album: Album? = albums.find { it.title.equals(albumTitle, ignoreCase = true) }
         ?: albums.find { it.title.contains(albumTitle, ignoreCase = true) }

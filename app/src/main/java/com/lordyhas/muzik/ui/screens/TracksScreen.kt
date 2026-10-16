@@ -1,5 +1,6 @@
 package com.lordyhas.muzik.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,6 +67,10 @@ fun TracksScreen(
     val isPlaying by viewModel.isPlaying.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+
+    BackHandler(enabled = searchQuery.isNotBlank()) {
+        viewModel.updateSearchQuery("")
+    }
 
     Column(
         modifier = modifier

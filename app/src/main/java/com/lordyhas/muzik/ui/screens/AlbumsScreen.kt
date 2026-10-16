@@ -1,5 +1,6 @@
 package com.lordyhas.muzik.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +65,10 @@ fun AlbumsScreen(
     val isLoading by viewModel.isLoading.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
+
+    BackHandler(enabled = searchQuery.isNotBlank()) {
+        searchQuery = ""
+    }
 
     val filteredAlbums = if (searchQuery.isBlank()) {
         albums
