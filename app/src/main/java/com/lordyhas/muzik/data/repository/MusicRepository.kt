@@ -30,7 +30,8 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.DURATION,
-            MediaStore.Audio.Media.DISPLAY_NAME
+            MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.TRACK
         )
 
         val selection = "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.MIME_TYPE} LIKE 'audio/%' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.mp3' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.m4a' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.wav' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.flac' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.ogg' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.aac' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.opus') AND (${MediaStore.Audio.Media.IS_RINGTONE} == 0 OR ${MediaStore.Audio.Media.IS_RINGTONE} IS NULL) AND (${MediaStore.Audio.Media.IS_NOTIFICATION} == 0 OR ${MediaStore.Audio.Media.IS_NOTIFICATION} IS NULL) AND (${MediaStore.Audio.Media.IS_ALARM} == 0 OR ${MediaStore.Audio.Media.IS_ALARM} IS NULL)"
@@ -53,6 +54,7 @@ class MusicRepository(private val context: Context) {
                 val albumIdColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
                 val durationColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
                 val displayNameColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
+                val trackColumn = it.getColumnIndex(MediaStore.Audio.Media.TRACK)
 
                 val albumArtUriBase = Uri.parse("content://media/external/audio/albumart")
 
@@ -64,6 +66,7 @@ class MusicRepository(private val context: Context) {
                     val albumId = it.getLong(albumIdColumn)
                     val duration = it.getLong(durationColumn)
                     val displayName = it.getString(displayNameColumn) ?: "audio_${id}"
+                    val rawTrack = if (trackColumn != -1 && !it.isNull(trackColumn)) it.getInt(trackColumn) else 0
 
                     val cleanTitle = when {
                         !rawTitle.isNullOrBlank() && rawTitle != "<unknown>" -> rawTitle
@@ -82,6 +85,24 @@ class MusicRepository(private val context: Context) {
                         ContentUris.withAppendedId(albumArtUriBase, albumId)
                     } else null
 
+                    val discNumber: Int?
+                    val trackNumber: Int?
+                    when {
+                        rawTrack >= 1000 -> {
+                            discNumber = rawTrack / 1000
+                            val t = rawTrack % 1000
+                            trackNumber = if (t > 0) t else null
+                        }
+                        rawTrack > 0 -> {
+                            discNumber = 1
+                            trackNumber = rawTrack
+                        }
+                        else -> {
+                            discNumber = null
+                            trackNumber = null
+                        }
+                    }
+
                     val song = Song(
                         id = id,
                         title = cleanTitle,
@@ -90,7 +111,9 @@ class MusicRepository(private val context: Context) {
                         albumId = albumId,
                         duration = if (duration < 0) 0L else duration,
                         contentUri = contentUri,
-                        albumArtUri = albumArtUri
+                        albumArtUri = albumArtUri,
+                        trackNumber = trackNumber,
+                        discNumber = discNumber
                     )
                     songsList.add(song)
                 }

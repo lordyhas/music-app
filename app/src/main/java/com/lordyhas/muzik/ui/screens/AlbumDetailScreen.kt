@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -120,6 +121,13 @@ fun AlbumDetailScreen(
     }
 
     val songs = album.songs
+    val distinctDiscs = remember(songs) {
+        songs.map { it.discNumber ?: 1 }.distinct()
+    }
+    val hasMultipleDiscs = distinctDiscs.size > 1
+    val songsByDisc = remember(songs) {
+        songs.groupBy { it.discNumber ?: 1 }.toSortedMap()
+    }
 
     Column(
         modifier = modifier
@@ -316,18 +324,45 @@ fun AlbumDetailScreen(
             }
 
             // Songs list
-            items(songs, key = { it.contentUri.toString() }) { song ->
-                val isSelected = currentSong?.id == song.id
-                SongItem(
-                    song = song,
-                    isSelected = isSelected,
-                    isPlaying = isPlaying && isSelected,
-                    onClick = { viewModel.playAlbum(album, song) },
-                    onAddToQueue = { viewModel.addToQueue(song) },
-                    onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
-                    onGoToArtist = { onGoToArtist(song.artist) },
-                    onShowDetails = { viewModel.selectSongForDetails(song) }
-                )
+            if (hasMultipleDiscs) {
+                songsByDisc.forEach { (discNumber, discSongs) ->
+                    item(key = "disc_header_$discNumber") {
+                        DiscHeader(
+                            discNumber = discNumber,
+                            trackCount = discSongs.size
+                        )
+                    }
+
+                    items(discSongs, key = { it.contentUri.toString() }) { song ->
+                        val isSelected = currentSong?.id == song.id
+                        SongItem(
+                            song = song,
+                            isSelected = isSelected,
+                            isPlaying = isPlaying && isSelected,
+                            onClick = { viewModel.playAlbum(album, song) },
+                            onAddToQueue = { viewModel.addToQueue(song) },
+                            onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
+                            onGoToArtist = { onGoToArtist(song.artist) },
+                            onShowDetails = { viewModel.selectSongForDetails(song) },
+                            showTrackNumber = true
+                        )
+                    }
+                }
+            } else {
+                items(songs, key = { it.contentUri.toString() }) { song ->
+                    val isSelected = currentSong?.id == song.id
+                    SongItem(
+                        song = song,
+                        isSelected = isSelected,
+                        isPlaying = isPlaying && isSelected,
+                        onClick = { viewModel.playAlbum(album, song) },
+                        onAddToQueue = { viewModel.addToQueue(song) },
+                        onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
+                        onGoToArtist = { onGoToArtist(song.artist) },
+                        onShowDetails = { viewModel.selectSongForDetails(song) },
+                        showTrackNumber = true
+                    )
+                }
             }
 
             item {
@@ -336,3 +371,68 @@ fun AlbumDetailScreen(
         }
     }
 }
+
+@Composable
+private fun DiscHeader(
+    discNumber: Int,
+    trackCount: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 6.dp, start = 4.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(AccentSecondary.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Album,
+                contentDescription = null,
+                tint = AccentSecondary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Text(
+            text = "Disque $discNumber",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            ),
+            color = TextPrimary
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Text(
+            text = "• $trackCount titre${if (trackCount > 1) "s" else ""}",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextMuted
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(1.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            SurfaceElevated,
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+    }
+}
+

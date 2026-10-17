@@ -14,7 +14,9 @@ data class Song(
     val albumId: Long,
     val duration: Long,
     val contentUri: Uri,
-    val albumArtUri: Uri? = null
+    val albumArtUri: Uri? = null,
+    val trackNumber: Int? = null,
+    val discNumber: Int? = null
 ) {
     fun formattedDuration(): String {
         val minutes = TimeUnit.MILLISECONDS.toMinutes(duration)
@@ -28,6 +30,9 @@ data class Song(
             .setArtist(artist)
             .setAlbumTitle(album)
             .setDisplayTitle(title)
+
+        trackNumber?.let { metadataBuilder.setTrackNumber(it) }
+        discNumber?.let { metadataBuilder.setDiscNumber(it) }
 
         albumArtUri?.let {
             metadataBuilder.setArtworkUri(it)

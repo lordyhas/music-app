@@ -10,3 +10,13 @@ data class Album(
     val songCount: Int,
     val songs: List<Song> = emptyList()
 )
+
+fun List<Song>.sortedForAlbum(): List<Song> {
+    return sortedWith(
+        compareBy<Song> { it.discNumber ?: 1 }
+            .thenBy { if (it.trackNumber != null && it.trackNumber > 0) 0 else 1 }
+            .thenBy { it.trackNumber ?: Int.MAX_VALUE }
+            .thenBy { it.title.lowercase() }
+    )
+}
+
