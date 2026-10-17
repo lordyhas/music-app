@@ -20,7 +20,9 @@ data class Song(
     /** Seconds since epoch when the file was added to the device (MediaStore DATE_ADDED). */
     val dateAdded: Long = 0L,
     /** Directory containing the file, e.g. "/storage/emulated/0/Music/Rock". */
-    val folderPath: String = ""
+    val folderPath: String = "",
+    /** File name with extension, e.g. "01 - Intro.mp3". */
+    val fileName: String = ""
 ) {
     fun formattedDuration(): String {
         val minutes = TimeUnit.MILLISECONDS.toMinutes(duration)

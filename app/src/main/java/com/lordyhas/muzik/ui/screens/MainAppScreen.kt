@@ -116,6 +116,8 @@ fun MainAppScreen(
     val showCreatePlaylistDialog by viewModel.showCreatePlaylistDialog.collectAsState()
     val sleepTimer by viewModel.sleepTimer.collectAsState()
     val likedIds by viewModel.likedSongIds.collectAsState()
+    val showLyrics by viewModel.showLyrics.collectAsState()
+    val lyricsState by viewModel.lyrics.collectAsState()
     val playbackSpeed by viewModel.playbackSpeed.collectAsState()
     val equalizer by viewModel.equalizer.collectAsState()
     val equalizerInfo by viewModel.equalizerInfo.collectAsState()
@@ -471,6 +473,9 @@ fun MainAppScreen(
                 onAudioEffectsClick = { showAudioEffectsSheet = true },
                 isLiked = currentSong?.id?.let { it in likedIds } == true,
                 onToggleLike = { currentSong?.let { viewModel.toggleLike(it) } },
+                showLyrics = showLyrics,
+                lyricsState = lyricsState,
+                onToggleLyrics = { viewModel.toggleLyrics() },
                 onDismiss = { viewModel.setShowNowPlaying(false) }
             )
         }
