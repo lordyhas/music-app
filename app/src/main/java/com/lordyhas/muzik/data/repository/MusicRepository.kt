@@ -15,9 +15,10 @@ class MusicRepository(private val context: Context) {
 
     private val supportedExtensions = setOf("mp3", "m4a", "wav", "flac", "ogg", "aac", "opus")
 
-    suspend fun getLocalSongs(): List<Song> = withContext(Dispatchers.IO) {
+    /** @param scanStorage ask the media scanner to index new files first (skipped by the playback service) */
+    suspend fun getLocalSongs(scanStorage: Boolean = true): List<Song> = withContext(Dispatchers.IO) {
         // Trigger media scan on directories so Android indexes any newly added files
-        scanAndIndexStorage()
+        if (scanStorage) scanAndIndexStorage()
 
         val songsList = mutableListOf<Song>()
 

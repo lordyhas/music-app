@@ -2,17 +2,31 @@ package com.lordyhas.muzik.service
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.Bitmap
+import android.net.Uri
 import android.media.audiofx.Equalizer
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.core.graphics.drawable.toBitmap
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionError
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import com.lordyhas.muzik.MainActivity
 import com.lordyhas.muzik.data.repository.LibraryRepository
+import com.lordyhas.muzik.widget.NowPlayingWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,10 +35,18 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * Background playback. Also a MediaLibraryService so Android Auto / media browsers can browse the
+ * library, and so the system can resume the last session (e.g. Bluetooth play) after process death.
+ */
 @UnstableApi
-class MusicPlaybackService : MediaSessionService() {
+class MusicPlaybackService : MediaLibraryService() {
 
-    private var mediaSession: MediaSession? = null
+    private var mediaSession: MediaLibrarySession? = null
+    private lateinit var libraryTree: MediaLibraryTree
+    private var widgetArtJob: Job? = null
+    private var widgetArtUri: Uri? = null
+    private var widgetArt: Bitmap? = null
     private var exoPlayer: ExoPlayer? = null
     private var equalizer: Equalizer? = null
 
@@ -48,7 +70,12 @@ class MusicPlaybackService : MediaSessionService() {
             saveProgress()
         }
 
+        override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+            updateWidget()
+        }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            updateWidget()
             if (isPlaying) {
                 recordPendingPlay()
                 startProgressSaver()
@@ -73,6 +100,7 @@ class MusicPlaybackService : MediaSessionService() {
         super.onCreate()
         PlaybackSettings.init(this)
         libraryRepository = LibraryRepository(this)
+        libraryTree = MediaLibraryTree(this)
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -99,15 +127,14 @@ class MusicPlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        mediaSession = MediaSession.Builder(this, player)
+        mediaSession = MediaLibrarySession.Builder(this, player, LibraryCallback())
             .setSessionActivity(sessionActivityPendingIntent)
-            .setCallback(MediaSessionCallback())
             .build()
 
         observeSettings()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
         return mediaSession
     }
 
@@ -262,8 +289,111 @@ class MusicPlaybackService : MediaSessionService() {
         equalizer = null
     }
 
-    private class MediaSessionCallback : MediaSession.Callback {
-        // Can override commands or handle custom actions if needed
+    // ─── Media library (Android Auto, browsers, resumption) ─────────────────
+
+    private inner class LibraryCallback : MediaLibrarySession.Callback {
+
+        override fun onGetLibraryRoot(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<MediaItem>> =
+            Futures.immediateFuture(LibraryResult.ofItem(libraryTree.root(), params))
+
+        override fun onGetChildren(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            parentId: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = future {
+            val all = libraryTree.children(parentId)
+            val from = (page.toLong() * pageSize).coerceIn(0, all.size.toLong()).toInt()
+            val to = (from.toLong() + pageSize).coerceAtMost(all.size.toLong()).toInt()
+            LibraryResult.ofItemList(all.subList(from, to), params)
+        }
+
+        override fun onGetItem(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            mediaId: String
+        ): ListenableFuture<LibraryResult<MediaItem>> = future {
+            libraryTree.item(mediaId)?.let { LibraryResult.ofItem(it, null) }
+                ?: LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
+        }
+
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>
+        ): ListenableFuture<MutableList<MediaItem>> = future {
+            libraryTree.resolve(mediaItems).toMutableList()
+        }
+
+        override fun onSetMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = future {
+            libraryTree.expand(mediaItems, startIndex, startPositionMs)
+        }
+
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = future {
+            libraryTree.resumption() ?: throw UnsupportedOperationException("No saved session to resume")
+        }
+    }
+
+    /** Runs [block] on the service scope and exposes it as the ListenableFuture Media3 expects. */
+    private fun <T> future(block: suspend () -> T): ListenableFuture<T> {
+        val result = SettableFuture.create<T>()
+        serviceScope.launch {
+            try {
+                result.set(block())
+            } catch (e: Exception) {
+                result.setException(e)
+            }
+        }
+        return result
+    }
+
+    // ─── Home-screen widget ─────────────────────────────────────────────────
+
+    private fun updateWidget() {
+        if (!NowPlayingWidget.hasWidgets(this)) return
+        val player = exoPlayer ?: return
+        val meta = player.mediaMetadata
+        val title = meta.title?.toString()
+        val artist = meta.artist?.toString()
+        val artUri = meta.artworkUri
+
+        NowPlayingWidget.update(this, title, artist, player.isPlaying, widgetArt.takeIf { widgetArtUri == artUri })
+
+        if (artUri != widgetArtUri) {
+            widgetArtJob?.cancel()
+            widgetArtJob = serviceScope.launch {
+                val bitmap = artUri?.let { loadArtwork(it) }
+                widgetArtUri = artUri
+                widgetArt = bitmap
+                NowPlayingWidget.update(this@MusicPlaybackService, title, artist, exoPlayer?.isPlaying == true, bitmap)
+            }
+        }
+    }
+
+    private suspend fun loadArtwork(uri: Uri): Bitmap? = try {
+        val request = ImageRequest.Builder(this)
+            .data(uri)
+            .size(256)
+            .allowHardware(false)
+            .build()
+        (imageLoader.execute(request) as? SuccessResult)?.drawable?.toBitmap()
+    } catch (e: Exception) {
+        null
     }
 
     private companion object {
