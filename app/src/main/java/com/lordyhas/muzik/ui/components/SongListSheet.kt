@@ -158,7 +158,7 @@ fun SongListSheet(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${songs.size} titre${if (songs.size > 1) "s" else ""}",
+                        text = pluralize(songs.size, "song"),
                         style = MaterialTheme.typography.labelMedium,
                         color = AccentPrimary
                     )
@@ -173,7 +173,7 @@ fun SongListSheet(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Fermer",
+                        contentDescription = "Close",
                         tint = TextSecondary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -203,7 +203,7 @@ fun SongListSheet(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Tout lire",
+                        text = "Play",
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -228,7 +228,7 @@ fun SongListSheet(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Aléatoire",
+                        text = "Shuffle",
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.Bold,
                             color = AccentSecondary

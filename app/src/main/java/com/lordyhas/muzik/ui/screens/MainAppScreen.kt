@@ -21,11 +21,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.MusicNote
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -67,15 +72,21 @@ import com.lordyhas.muzik.ui.theme.SurfaceCard
 import com.lordyhas.muzik.ui.theme.SurfaceDark
 import com.lordyhas.muzik.ui.theme.SurfaceElevated
 import com.lordyhas.muzik.ui.theme.TextMuted
+import com.lordyhas.muzik.ui.theme.TextPrimary
 import com.lordyhas.muzik.ui.theme.TrackBackground
 import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
 
-enum class NavigationTab(val route: String, val title: String, val icon: ImageVector) {
-    HOME("home", "Accueil", Icons.Default.Home),
-    TRACKS("tracks", "Titres", Icons.Default.MusicNote),
-    ALBUMS("albums", "Albums", Icons.Default.Album),
-    ARTISTS("artists", "Artistes", Icons.Default.Person),
-    PLAYLISTS("playlists", "Playlists", Icons.Default.PlaylistPlay)
+enum class NavigationTab(
+    val route: String,
+    val title: String,
+    val selectedIcon: ImageVector,
+    val icon: ImageVector
+) {
+    HOME("home", "Home", Icons.Filled.Home, Icons.Outlined.Home),
+    TRACKS("tracks", "Songs", Icons.Filled.MusicNote, Icons.Outlined.MusicNote),
+    ALBUMS("albums", "Albums", Icons.Filled.Album, Icons.Outlined.Album),
+    ARTISTS("artists", "Artists", Icons.Filled.Person, Icons.Outlined.Person),
+    PLAYLISTS("playlists", "Playlists", Icons.AutoMirrored.Filled.PlaylistPlay, Icons.AutoMirrored.Outlined.PlaylistPlay)
 }
 
 @UnstableApi
@@ -159,7 +170,7 @@ fun MainAppScreen(
             (context as? Activity)?.finish()
         } else {
             backPressedTime = now
-            Toast.makeText(context, "Appuyez à nouveau pour quitter", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Press back again to exit", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -171,6 +182,16 @@ fun MainAppScreen(
     fun navigateToArtist(artistName: String) {
         val encoded = URLEncoder.encode(artistName, StandardCharsets.UTF_8.toString())
         navController.navigate("artist/$encoded")
+    }
+
+    fun navigateToTab(tab: NavigationTab) {
+        navController.navigate(tab.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
     }
 
     fun navigateToPlaylist(playlistId: String) {
@@ -206,7 +227,7 @@ fun MainAppScreen(
                     // Bottom Navigation Bar (always visible)
                     NavigationBar(
                             containerColor = SurfaceDark,
-                            tonalElevation = 8.dp,
+                            tonalElevation = 0.dp,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .navigationBarsPadding()
@@ -228,7 +249,7 @@ fun MainAppScreen(
                                     },
                                     icon = {
                                         Icon(
-                                            imageVector = tab.icon,
+                                            imageVector = if (isSelected) tab.selectedIcon else tab.icon,
                                             contentDescription = tab.title
                                         )
                                     },
@@ -236,15 +257,15 @@ fun MainAppScreen(
                                         Text(
                                             text = tab.title,
                                             fontSize = 11.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
                                         selectedIconColor = AccentPrimary,
-                                        selectedTextColor = AccentPrimary,
+                                        selectedTextColor = TextPrimary,
                                         unselectedIconColor = TextMuted,
                                         unselectedTextColor = TextMuted,
-                                        indicatorColor = SurfaceCard
+                                        indicatorColor = AccentPrimary.copy(alpha = 0.14f)
                                     )
                                 )
                         }
@@ -269,7 +290,9 @@ fun MainAppScreen(
                         HomeScreen(
                             viewModel = viewModel,
                             onAlbumClick = { title -> navigateToAlbum(title) },
-                            onArtistClick = { name -> navigateToArtist(name) }
+                            onArtistClick = { name -> navigateToArtist(name) },
+                            onSeeAllAlbums = { navigateToTab(NavigationTab.ALBUMS) },
+                            onSeeAllArtists = { navigateToTab(NavigationTab.ARTISTS) }
                         )
                     }
 
@@ -406,16 +429,11 @@ fun MainAppScreen(
         // ─── Create Playlist Dialog (global, triggered from AddToPlaylistSheet) ─
         if (showCreatePlaylistDialog && songPendingAddToPlaylist != null) {
             CreatePlaylistDialog(
-                title = "Nouvelle playlist",
+                title = "New playlist",
                 initialName = "",
                 onConfirm = { name ->
-                    val created = viewModel.playlists.value
-                    viewModel.createPlaylist(name)
-                    // After creation, automatically add the pending song
-                    val newPlaylist = viewModel.playlists.value.firstOrNull { p ->
-                        p.name == name.trim() && p !in created
-                    }
-                    newPlaylist?.let { viewModel.addSongToPlaylist(it.id, songPendingAddToPlaylist!!.id) }
+                    // Create the playlist and add the pending song once it exists
+                    viewModel.createPlaylist(name, initialSongId = songPendingAddToPlaylist?.id)
                     viewModel.setShowCreatePlaylistDialog(false)
                     viewModel.setSongPendingAddToPlaylist(null)
                 },

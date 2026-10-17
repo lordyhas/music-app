@@ -1,12 +1,12 @@
 package com.lordyhas.muzik.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -22,9 +22,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.lordyhas.muzik.ui.theme.AccentPrimary
+import com.lordyhas.muzik.ui.theme.StrokeSubtle
 import com.lordyhas.muzik.ui.theme.SurfaceCard
 import com.lordyhas.muzik.ui.theme.SurfaceElevated
 import com.lordyhas.muzik.ui.theme.TextMuted
@@ -34,20 +36,23 @@ import com.lordyhas.muzik.ui.theme.TextSecondary
 /**
  * Reusable dialog for creating a new playlist or renaming an existing one.
  *
- * @param title       Dialog title (e.g. "Nouvelle playlist" or "Renommer")
- * @param initialName Pre-filled name (empty for creation, existing name for rename)
- * @param onConfirm   Called with the trimmed name when the user confirms
- * @param onDismiss   Called when the dialog is dismissed
+ * @param title        Dialog title (e.g. "New playlist" or "Rename playlist")
+ * @param initialName  Pre-filled name (empty for creation, existing name for rename)
+ * @param confirmLabel Label of the confirm button
+ * @param onConfirm    Called with the trimmed name when the user confirms
+ * @param onDismiss    Called when the dialog is dismissed
  */
 @Composable
 fun CreatePlaylistDialog(
-    title: String = "Nouvelle playlist",
+    title: String = "New playlist",
     initialName: String = "",
+    confirmLabel: String = "Create",
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf(initialName) }
     val focusRequester = remember { FocusRequester() }
+    val canConfirm = name.isNotBlank()
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -56,11 +61,11 @@ fun CreatePlaylistDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SurfaceCard,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         title = {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = TextPrimary
             )
         },
@@ -75,18 +80,23 @@ fun CreatePlaylistDialog(
                         .focusRequester(focusRequester),
                     placeholder = {
                         Text(
-                            text = "Nom de la playlist",
+                            text = "Playlist name",
                             color = TextMuted,
-                            fontSize = 14.sp
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { if (canConfirm) onConfirm(name.trim()) }),
+                    shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = SurfaceElevated,
                         unfocusedContainerColor = SurfaceElevated,
                         focusedBorderColor = AccentPrimary,
-                        unfocusedBorderColor = TextMuted.copy(alpha = 0.3f),
+                        unfocusedBorderColor = StrokeSubtle,
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
                         cursorColor = AccentPrimary
@@ -96,18 +106,18 @@ fun CreatePlaylistDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { if (name.isNotBlank()) onConfirm(name.trim()) },
-                enabled = name.isNotBlank()
+                onClick = { if (canConfirm) onConfirm(name.trim()) },
+                enabled = canConfirm
             ) {
                 Text(
-                    text = "Confirmer",
-                    color = if (name.isNotBlank()) AccentPrimary else TextMuted
+                    text = confirmLabel,
+                    color = if (canConfirm) AccentPrimary else TextMuted
                 )
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(text = "Annuler", color = TextSecondary)
+                Text(text = "Cancel", color = TextSecondary)
             }
         }
     )

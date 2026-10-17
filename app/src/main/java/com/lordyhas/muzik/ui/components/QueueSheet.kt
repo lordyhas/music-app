@@ -106,7 +106,7 @@ fun QueueSheet(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "File d'attente (${queue.size})",
+                        text = "Queue (${queue.size})",
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp
@@ -124,7 +124,7 @@ fun QueueSheet(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Fermer",
+                        contentDescription = "Close",
                         tint = TextSecondary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -139,7 +139,7 @@ fun QueueSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "La file d'attente est vide",
+                        text = "Queue is empty",
                         style = MaterialTheme.typography.bodyLarge,
                         color = TextMuted
                     )
@@ -153,7 +153,7 @@ fun QueueSheet(
                     if (currentIndex in queue.indices) {
                         item {
                             Text(
-                                text = "EN COURS DE LECTURE",
+                                text = "NOW PLAYING",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     letterSpacing = 1.5.sp,
                                     fontWeight = FontWeight.Bold
@@ -175,7 +175,7 @@ fun QueueSheet(
 
                             if (currentIndex + 1 < queue.size) {
                                 Text(
-                                    text = "À SUIVRE",
+                                    text = "UP NEXT",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         letterSpacing = 1.5.sp,
                                         fontWeight = FontWeight.Bold
@@ -205,7 +205,7 @@ fun QueueSheet(
                         item {
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "PRÉCÉDENTS DANS LA FILE",
+                                text = "PREVIOUSLY PLAYED",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     letterSpacing = 1.5.sp,
                                     fontWeight = FontWeight.Bold
@@ -332,7 +332,7 @@ private fun QueueSongItem(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Retirer de la file",
+                    contentDescription = "Remove from queue",
                     tint = TextMuted,
                     modifier = Modifier.size(18.dp)
                 )

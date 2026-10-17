@@ -73,8 +73,8 @@ class MusicRepository(private val context: Context) {
                         else -> displayName.substringBeforeLast(".")
                     }
 
-                    val artist = if (rawArtist == "<unknown>" || rawArtist.isNullOrBlank()) "Artiste inconnu" else rawArtist
-                    val album = if (rawAlbum == "<unknown>" || rawAlbum.isNullOrBlank()) "Album inconnu" else rawAlbum
+                    val artist = if (rawArtist == "<unknown>" || rawArtist.isNullOrBlank()) "Unknown artist" else rawArtist
+                    val album = if (rawAlbum == "<unknown>" || rawAlbum.isNullOrBlank()) "Unknown album" else rawAlbum
 
                     val contentUri = ContentUris.withAppendedId(
                         MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
