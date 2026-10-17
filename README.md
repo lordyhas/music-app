@@ -10,24 +10,36 @@ It provides a seamless, fast, and elegant offline listening experience with zero
 
 - **High-Performance Audio Playback**:
   - Audio engine powered by **AndroidX Media3 / ExoPlayer**.
-  - Background playback via a dedicated foreground service (`MediaSessionService`).
+  - Background playback via a dedicated foreground service (`MediaLibraryService`).
   - Lockscreen controls and system notification media controls.
-  - Full playback queue support with shuffle and repeat modes (*Repeat All*, *Repeat One*, *Off*).
+  - Full playback queue with shuffle and repeat modes (*Repeat All*, *Repeat One*, *Off*).
+  - **Spotify-style queue**: "Add to queue" songs play next in order; drag handles to reorder upcoming songs.
+  - **Resume where you left off**: queue, song and position are restored on the next launch, and the system can resume your last session (e.g. a Bluetooth play button) even after the app was closed.
+  - **Sleep timer**: 5–90 minutes or "end of current song", with a gentle fade-out. Keeps working with the app closed.
+  - **Equalizer & playback speed**: system equalizer with presets and per-band sliders, and 0.5x–2x speed, remembered across launches.
 
 - **Modern & Fluid UI (Jetpack Compose & Material 3)**:
-  - Polished dark theme with subtle gradients and fluid navigation animations.
-  - **Persistent Mini-Player**: seamless browsing while keeping playback controls accessible.
-  - **Animated Fullscreen Now Playing screen**: high-res album artwork, thin seek bar, and instant queue management.
+  - Polished dark theme with colors that adapt to the current album artwork.
+  - **Persistent Mini-Player**: swipe left/right to skip, tap to open the full player.
+  - **Fullscreen Now Playing**: blurred artwork backdrop, swipe the cover to skip, like button, "Up next" preview and the queue one swipe away.
+  - **Lyrics**: synced lyrics follow the song (tap a line to jump there); plain lyrics scroll. Read from tags embedded in the file (MP3, FLAC, OGG/Opus, M4A) or from a `.lrc` file next to the song.
 
 - **Local Music Organization**:
-  - **Home**: smart greetings based on the time of day, recently played tracks, albums, and artists.
-  - **Tracks**: complete list of all local songs with real-time search, sorting, and fast indexing via `MediaStore`.
-  - **Albums**: browse by album with cover artwork, disc numbers, and track numbers.
-  - **Artists**: explore your music library by artist and quickly access their discography.
-  - **Custom Playlists**: create, edit, and manage custom playlists backed by **Room Database**.
+  - **Home**: time-of-day greeting, "Jump back in", quick mixes, shortcuts, recently played tracks, albums and artists.
+  - **Songs**: every local song with real-time search, sorting (title, artist, album, recently added, duration) and an A–Z fast scroller.
+  - **Albums**: browse by album with cover artwork, disc numbers and track numbers.
+  - **Artists**: explore your library by artist, with their albums and songs.
+  - **Folders**: browse music by device folder.
+  - **Search**: one search across songs, artists, albums and playlists.
+  - **Custom Playlists**: create, rename, reorder and delete playlists backed by **Room**.
+  - **Smart Playlists**: *Liked Songs*, *Most Played*, *Recently Added* and *Rediscover*, built automatically from your likes and listening history.
+
+- **Everywhere you listen**:
+  - **Android Auto**: browse Recently played, Liked Songs, Playlists, Albums, Artists and all songs from the car.
+  - **Home-screen widget**: artwork, title and previous / play-pause / next controls.
 
 - **Track Details & Metadata**:
-  - Inspect detailed audio information (title, artist, album, duration, file format, bitrate, sample rate, and file path).
+  - Inspect song information (title, artist, album, track/disc number, duration and file location).
 
 -  **Privacy & Permission Handling**:
   - 100% offline — your data stays strictly on your device.
@@ -78,6 +90,7 @@ It provides a seamless, fast, and elegant offline listening experience with zero
      .\gradlew.bat assembleDebug
      ```
    - The generated debug APK will be located at `app/build/outputs/apk/debug/app-debug.apk`.
+   - Run the unit tests with `.\gradlew.bat testDebugUnitTest`.
 
 ---
 
@@ -89,16 +102,20 @@ app/src/main/
 ├── java/com/lordyhas/muzik/
 │   ├── MainActivity.kt               # Main entry point activity
 │   ├── data/
-│   │   ├── local/                    # Room database (Playlists, DAOs, Entities)
-│   │   ├── model/                    # Data models (Song, Album, Artist, Playlist)
-│   │   └── repository/               # Repositories (MediaStore & Playlist data layers)
+│   │   ├── local/                    # Room database (playlists, liked songs, play stats)
+│   │   ├── model/                    # Data models (Song, Album, Artist, Playlist, sorting, smart playlists)
+│   │   └── repository/               # MediaStore, playlists, likes/history and lyrics
 │   ├── service/
-│   │   ├── MusicPlaybackService.kt   # Media3 background playback service
-│   │   └── MusicController.kt        # Media controller bridge
+│   │   ├── MusicPlaybackService.kt   # Media3 playback + library service (Auto, resumption, sleep timer, EQ)
+│   │   ├── MusicController.kt        # Media controller bridge & queue model
+│   │   ├── MediaLibraryTree.kt       # Browse tree for Android Auto / media browsers
+│   │   ├── PlaybackSettings.kt       # Sleep timer, speed & equalizer settings shared with the service
+│   │   └── PlaybackStateStore.kt     # Saved queue/position for "resume where you left off"
+│   ├── widget/                       # Home-screen now-playing widget
 │   └── ui/
-│       ├── components/               # Reusable Compose components (MiniPlayer, NowPlaying, etc.)
-│       ├── screens/                  # Main screens (Home, Tracks, Albums, Artists, Playlists...)
-│       ├── theme/                    # Color palette, Typography, and Material3 theme
+│       ├── components/               # Reusable Compose components (MiniPlayer, NowPlaying, Lyrics, sheets...)
+│       ├── screens/                  # Screens (Home, Songs, Albums, Artists, Playlists, Search, Folders...)
+│       ├── theme/                    # Color palette, typography, artwork-based accent colors
 │       └── viewmodel/                # MusicViewModel (UI state management)
 └── res/                              # Drawables, mipmaps, launcher icons, XML resources
 ```
