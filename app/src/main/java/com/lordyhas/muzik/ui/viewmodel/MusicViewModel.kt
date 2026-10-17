@@ -10,6 +10,7 @@ import com.lordyhas.muzik.data.model.Album
 import com.lordyhas.muzik.data.model.Artist
 import com.lordyhas.muzik.data.model.Playlist
 import com.lordyhas.muzik.data.model.Song
+import com.lordyhas.muzik.data.model.sortedForAlbum
 import com.lordyhas.muzik.data.repository.MusicRepository
 import com.lordyhas.muzik.data.repository.PlaylistRepository
 import com.lordyhas.muzik.service.MusicController
@@ -132,14 +133,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val albums: StateFlow<List<Album>> = _songs.map { songList ->
         songList.groupBy { it.album }
             .map { (albumTitle, albumSongs) ->
-                val first = albumSongs.first()
+                val sortedSongs = albumSongs.sortedForAlbum()
+                val first = sortedSongs.first()
                 Album(
                     id = first.albumId,
                     title = albumTitle,
                     artist = first.artist,
-                    albumArtUri = albumSongs.firstOrNull { it.albumArtUri != null }?.albumArtUri,
-                    songCount = albumSongs.size,
-                    songs = albumSongs
+                    albumArtUri = sortedSongs.firstOrNull { it.albumArtUri != null }?.albumArtUri,
+                    songCount = sortedSongs.size,
+                    songs = sortedSongs
                 )
             }
             .sortedBy { it.title.lowercase() }

@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +53,7 @@ import com.lordyhas.muzik.ui.theme.SurfaceElevated
 import com.lordyhas.muzik.ui.theme.TextMuted
 import com.lordyhas.muzik.ui.theme.TextPrimary
 import com.lordyhas.muzik.ui.theme.TextSecondary
+import java.util.Locale
 
 @Composable
 fun SongItem(
@@ -65,6 +67,7 @@ fun SongItem(
     onGoToArtist: (() -> Unit)? = null,
     onGoToAlbum: (() -> Unit)? = null,
     onShowDetails: (() -> Unit)? = null,
+    showTrackNumber: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
@@ -83,6 +86,25 @@ fun SongItem(
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (showTrackNumber) {
+            val trackText = if (song.trackNumber != null && song.trackNumber > 0) {
+                String.format(Locale.getDefault(), "%02d", song.trackNumber)
+            } else {
+                "--"
+            }
+            Text(
+                text = trackText,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp
+                ),
+                color = if (isSelected) AccentPrimary else TextMuted,
+                modifier = Modifier.width(26.dp),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+
         // Album art thumbnail
         Box(
             modifier = Modifier

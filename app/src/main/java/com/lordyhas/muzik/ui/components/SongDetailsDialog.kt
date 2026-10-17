@@ -205,6 +205,19 @@ fun SongDetailsDialog(
                     value = song.album
                 )
 
+                if (song.trackNumber != null && song.trackNumber > 0) {
+                    val trackLabel = if (song.discNumber != null && song.discNumber > 1) {
+                        "Piste ${song.trackNumber} (Disque ${song.discNumber})"
+                    } else {
+                        "Piste ${song.trackNumber}"
+                    }
+                    DetailRow(
+                        icon = Icons.Default.MusicNote,
+                        label = "Piste",
+                        value = trackLabel
+                    )
+                }
+
                 DetailRow(
                     icon = Icons.Default.Schedule,
                     label = "Durée",
