@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Muzik" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Dark window background avoids a white flash before Compose draws -->
+    <style name="Theme.Muzik" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/muzik_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/muzik_background</item>
+    </style>
 </resources>

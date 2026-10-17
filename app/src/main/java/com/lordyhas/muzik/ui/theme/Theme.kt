@@ -16,6 +16,11 @@ private val DarkColorScheme = darkColorScheme(
     background = BackgroundDark,
     surface = SurfaceDark,
     surfaceVariant = SurfaceCard,
+    surfaceContainer = SurfaceCard,
+    surfaceContainerHigh = SurfaceElevated,
+    outline = TextMuted,
+    outlineVariant = StrokeSubtle,
+    error = DangerRed,
     onPrimary = TextPrimary,
     onSecondary = TextPrimary,
     onTertiary = TextPrimary,
@@ -32,7 +37,7 @@ fun MuzikTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = BackgroundDark.toArgb()
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
             window.navigationBarColor = BackgroundDark.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
             WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false

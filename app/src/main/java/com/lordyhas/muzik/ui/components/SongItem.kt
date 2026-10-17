@@ -1,6 +1,12 @@
 package com.lordyhas.muzik.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -13,14 +19,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -35,25 +40,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.ui.theme.AccentPrimary
-import com.lordyhas.muzik.ui.theme.SurfaceCard
+import com.lordyhas.muzik.ui.theme.DangerRed
 import com.lordyhas.muzik.ui.theme.SurfaceElevated
 import com.lordyhas.muzik.ui.theme.TextMuted
 import com.lordyhas.muzik.ui.theme.TextPrimary
 import com.lordyhas.muzik.ui.theme.TextSecondary
-import java.util.Locale
 
 @Composable
 fun SongItem(
@@ -68,12 +70,13 @@ fun SongItem(
     onGoToAlbum: (() -> Unit)? = null,
     onShowDetails: (() -> Unit)? = null,
     showTrackNumber: Boolean = false,
+    showArtwork: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
 
     val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) SurfaceElevated else SurfaceCard,
+        targetValue = if (isSelected) AccentPrimary.copy(alpha = 0.10f) else Color.Transparent,
         label = "item_bg"
     )
 
@@ -83,109 +86,69 @@ fun SongItem(
             .clip(RoundedCornerShape(14.dp))
             .background(backgroundColor)
             .clickable(onClick = onClick)
-            .padding(10.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (showTrackNumber) {
-            val trackText = if (song.trackNumber != null && song.trackNumber > 0) {
-                String.format(Locale.getDefault(), "%02d", song.trackNumber)
-            } else {
-                "--"
-            }
-            Text(
-                text = trackText,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                ),
-                color = if (isSelected) AccentPrimary else TextMuted,
-                modifier = Modifier.width(26.dp),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-        }
-
-        // Album art thumbnail
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(SurfaceElevated, Color(0xFF2E2C44))
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (song.albumArtUri != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(song.albumArtUri)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Album Artwork",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.matchParentSize()
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = null,
-                    tint = if (isSelected) AccentPrimary else TextMuted,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-
-            if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(Color.Black.copy(alpha = 0.35f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Equalizer,
-                        contentDescription = "En lecture",
-                        tint = AccentPrimary,
-                        modifier = Modifier.size(24.dp)
+            Box(modifier = Modifier.width(32.dp), contentAlignment = Alignment.Center) {
+                if (isSelected) {
+                    EqualizerBars(isAnimating = isPlaying, modifier = Modifier.size(16.dp))
+                } else {
+                    Text(
+                        text = song.trackNumber?.takeIf { it > 0 }?.toString() ?: "–",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TextMuted,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
+            Spacer(modifier = Modifier.width(8.dp))
         }
 
-        Spacer(modifier = Modifier.width(14.dp))
+        if (showArtwork) {
+            Box(contentAlignment = Alignment.Center) {
+                Artwork(
+                    uri = song.albumArtUri,
+                    shape = RoundedCornerShape(10.dp),
+                    iconSize = 22.dp,
+                    modifier = Modifier.size(52.dp)
+                )
+                if (isSelected && !showTrackNumber) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        EqualizerBars(isAnimating = isPlaying, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+        }
 
-        // Titles and artist
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
                 style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 15.sp
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
                 ),
                 color = if (isSelected) AccentPrimary else TextPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-
-            Spacer(modifier = Modifier.size(3.dp))
-
             Text(
-                text = song.artist + " • " + song.formattedDuration(),
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontSize = 13.sp
-                ),
+                text = "${song.artist} • ${song.formattedDuration()}",
+                style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
 
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(4.dp))
 
-        // Options Menu
         Box {
             IconButton(
                 onClick = { isMenuExpanded = true },
@@ -193,128 +156,78 @@ fun SongItem(
             ) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Options du morceau",
+                    contentDescription = "Song options",
                     tint = TextSecondary,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
             DropdownMenu(
                 expanded = isMenuExpanded,
                 onDismissRequest = { isMenuExpanded = false },
-                modifier = Modifier
-                    .background(SurfaceElevated)
-                    .clip(RoundedCornerShape(12.dp))
+                modifier = Modifier.background(SurfaceElevated)
             ) {
-                if (onAddToQueue != null) {
+                @Composable
+                fun MenuItem(label: String, icon: ImageVector, tint: Color, action: () -> Unit) {
                     DropdownMenuItem(
-                        text = { Text("Ajouter à la file d'attente", color = TextPrimary, fontSize = 14.sp) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.QueueMusic,
-                                contentDescription = null,
-                                tint = AccentPrimary,
-                                modifier = Modifier.size(20.dp)
+                        text = {
+                            Text(
+                                label,
+                                color = if (tint == DangerRed) DangerRed else TextPrimary,
+                                style = MaterialTheme.typography.bodyMedium
                             )
+                        },
+                        leadingIcon = {
+                            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
                         },
                         onClick = {
                             isMenuExpanded = false
-                            onAddToQueue()
+                            action()
                         }
                     )
                 }
 
-                if (onAddToPlaylist != null) {
-                    DropdownMenuItem(
-                        text = { Text("Ajouter à une playlist", color = TextPrimary, fontSize = 14.sp) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.QueueMusic,
-                                contentDescription = null,
-                                tint = AccentPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onAddToPlaylist()
-                        }
-                    )
-                }
-
-                if (onGoToArtist != null) {
-                    DropdownMenuItem(
-                        text = { Text("Aller à l'artiste", color = TextPrimary, fontSize = 14.sp) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Person,
-                                contentDescription = null,
-                                tint = TextSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onGoToArtist()
-                        }
-                    )
-                }
-
-                if (onGoToAlbum != null) {
-                    DropdownMenuItem(
-                        text = { Text("Aller à l'album", color = TextPrimary, fontSize = 14.sp) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Album,
-                                contentDescription = null,
-                                tint = TextSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onGoToAlbum()
-                        }
-                    )
-                }
-
-                if (onRemoveFromPlaylist != null) {
-                    DropdownMenuItem(
-                        text = { Text("Retirer de la playlist", color = TextPrimary, fontSize = 14.sp) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = Color(0xFFFF5252),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onRemoveFromPlaylist()
-                        }
-                    )
-                }
-
-                if (onShowDetails != null) {
-                    DropdownMenuItem(
-                        text = { Text("Détails du morceau", color = TextPrimary, fontSize = 14.sp) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Info,
-                                contentDescription = null,
-                                tint = TextSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            onShowDetails()
-                        }
-                    )
-                }
+                onAddToQueue?.let { MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic, AccentPrimary, it) }
+                onAddToPlaylist?.let { MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd, AccentPrimary, it) }
+                onGoToArtist?.let { MenuItem("Go to artist", Icons.Default.Person, TextSecondary, it) }
+                onGoToAlbum?.let { MenuItem("Go to album", Icons.Default.Album, TextSecondary, it) }
+                onRemoveFromPlaylist?.let { MenuItem("Remove from playlist", Icons.Default.Delete, DangerRed, it) }
+                onShowDetails?.let { MenuItem("Song details", Icons.Default.Info, TextSecondary, it) }
             }
         }
     }
 }
 
+/** Three bouncing bars that indicate the currently playing track. Static when paused. */
+@Composable
+fun EqualizerBars(
+    isAnimating: Boolean,
+    modifier: Modifier = Modifier,
+    color: Color = AccentPrimary
+) {
+    val transition = rememberInfiniteTransition(label = "eq")
+    val bars = listOf(520, 380, 450).map { duration ->
+        transition.animateFloat(
+            initialValue = 0.25f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(duration), RepeatMode.Reverse),
+            label = "eq_bar"
+        )
+    }
+    val pausedHeights = listOf(0.45f, 0.8f, 0.6f)
+
+    Canvas(modifier = modifier) {
+        val gap = size.width * 0.15f
+        val barWidth = (size.width - gap * 2) / 3
+        bars.forEachIndexed { i, anim ->
+            val fraction = if (isAnimating) anim.value else pausedHeights[i]
+            val h = size.height * fraction
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(i * (barWidth + gap), size.height - h),
+                size = Size(barWidth, h),
+                cornerRadius = CornerRadius(barWidth / 2)
+            )
+        }
+    }
+}

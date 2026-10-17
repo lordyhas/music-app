@@ -90,7 +90,7 @@ fun SongDetailsDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Détails du morceau",
+                    text = "Song details",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp
@@ -107,7 +107,7 @@ fun SongDetailsDialog(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Fermer",
+                        contentDescription = "Close",
                         tint = TextSecondary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -195,7 +195,7 @@ fun SongDetailsDialog(
             ) {
                 DetailRow(
                     icon = Icons.Default.Person,
-                    label = "Artiste",
+                    label = "Artist",
                     value = song.artist
                 )
 
@@ -207,26 +207,26 @@ fun SongDetailsDialog(
 
                 if (song.trackNumber != null && song.trackNumber > 0) {
                     val trackLabel = if (song.discNumber != null && song.discNumber > 1) {
-                        "Piste ${song.trackNumber} (Disque ${song.discNumber})"
+                        "Track ${song.trackNumber} (Disc ${song.discNumber})"
                     } else {
-                        "Piste ${song.trackNumber}"
+                        "Track ${song.trackNumber}"
                     }
                     DetailRow(
                         icon = Icons.Default.MusicNote,
-                        label = "Piste",
+                        label = "Track",
                         value = trackLabel
                     )
                 }
 
                 DetailRow(
                     icon = Icons.Default.Schedule,
-                    label = "Durée",
+                    label = "Duration",
                     value = song.formattedDuration()
                 )
 
                 DetailRow(
                     icon = Icons.Default.Folder,
-                    label = "Emplacement",
+                    label = "Location",
                     value = song.contentUri.toString()
                 )
             }

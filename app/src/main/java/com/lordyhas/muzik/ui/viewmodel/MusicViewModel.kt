@@ -187,9 +187,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             val mediaId = mediaItem.mediaId
             songList.find { it.id.toString() == mediaId } ?: Song(
                 id = mediaId.toLongOrNull() ?: 0L,
-                title = mediaItem.mediaMetadata.title?.toString() ?: "Titre inconnu",
-                artist = mediaItem.mediaMetadata.artist?.toString() ?: "Artiste inconnu",
-                album = mediaItem.mediaMetadata.albumTitle?.toString() ?: "Album inconnu",
+                title = mediaItem.mediaMetadata.title?.toString() ?: "Unknown title",
+                artist = mediaItem.mediaMetadata.artist?.toString() ?: "Unknown artist",
+                album = mediaItem.mediaMetadata.albumTitle?.toString() ?: "Unknown album",
                 albumId = 0L,
                 duration = 0L,
                 contentUri = android.net.Uri.EMPTY,
@@ -330,9 +330,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun setSongPendingAddToPlaylist(song: Song?) { _songPendingAddToPlaylist.value = song }
     fun setPlaylistPendingRename(playlist: Playlist?) { _playlistPendingRename.value = playlist }
 
-    fun createPlaylist(name: String) {
+    /** Creates a playlist and optionally adds [initialSongId] to it once it exists. */
+    fun createPlaylist(name: String, initialSongId: Long? = null) {
         if (name.isBlank()) return
-        viewModelScope.launch { playlistRepository.createPlaylist(name) }
+        viewModelScope.launch {
+            val created = playlistRepository.createPlaylist(name)
+            initialSongId?.let { playlistRepository.addSongToPlaylist(created.id, it) }
+        }
         // Room Flow auto-updates playlists StateFlow — no manual refresh
     }
 

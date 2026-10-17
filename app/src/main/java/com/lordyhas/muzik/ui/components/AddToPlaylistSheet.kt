@@ -48,7 +48,7 @@ import com.lordyhas.muzik.ui.theme.TextPrimary
 import com.lordyhas.muzik.ui.theme.TextSecondary
 
 /**
- * Bottom sheet shown when the user taps "Ajouter à une playlist" on a song.
+ * Bottom sheet shown when the user taps "Add to playlist" on a song.
  * Lists all existing playlists and offers a "Create new playlist" shortcut.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,7 +90,7 @@ fun AddToPlaylistSheet(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Ajouter à une playlist",
+                        text = "Add to playlist",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = TextPrimary
                     )
@@ -105,7 +105,7 @@ fun AddToPlaylistSheet(
                 IconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Fermer",
+                        contentDescription = "Close",
                         tint = TextSecondary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -140,7 +140,7 @@ fun AddToPlaylistSheet(
                 }
                 Spacer(modifier = Modifier.width(14.dp))
                 Text(
-                    text = "Créer une nouvelle playlist",
+                    text = "New playlist",
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = AccentPrimary
                 )
@@ -192,7 +192,7 @@ fun AddToPlaylistSheet(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "${playlist.songIds.size} titre${if (playlist.songIds.size > 1) "s" else ""}",
+                                text = pluralize(playlist.songIds.size, "song"),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextMuted,
                                 fontSize = 11.sp
@@ -200,7 +200,7 @@ fun AddToPlaylistSheet(
                         }
                         if (alreadyAdded) {
                             Text(
-                                text = "Déjà ajouté",
+                                text = "Added",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = AccentPrimary,
                                 fontSize = 11.sp
