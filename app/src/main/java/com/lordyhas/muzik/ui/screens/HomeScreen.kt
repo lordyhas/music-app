@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,9 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -78,7 +81,9 @@ fun HomeScreen(
     onArtistClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     onSeeAllAlbums: () -> Unit = {},
-    onSeeAllArtists: () -> Unit = {}
+    onSeeAllArtists: () -> Unit = {},
+    onSearchClick: () -> Unit = {},
+    onFoldersClick: () -> Unit = {}
 ) {
     val songs by viewModel.songs.collectAsState()
     val recentSongs by viewModel.recentlyPlayedSongs.collectAsState()
@@ -128,12 +133,19 @@ fun HomeScreen(
                         color = TextSecondary
                     )
                 }
-                CircleIconButton(
-                    icon = Icons.Default.Refresh,
-                    contentDescription = "Refresh library",
-                    onClick = { viewModel.loadSongs() },
-                    tint = TextSecondary
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircleIconButton(
+                        icon = Icons.Default.Search,
+                        contentDescription = "Search library",
+                        onClick = onSearchClick
+                    )
+                    CircleIconButton(
+                        icon = Icons.Default.Refresh,
+                        contentDescription = "Refresh library",
+                        onClick = { viewModel.loadSongs() },
+                        tint = TextSecondary
+                    )
+                }
             }
 
             when {
@@ -182,6 +194,19 @@ fun HomeScreen(
                             },
                             modifier = Modifier.weight(1f)
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Library shortcuts
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ShortcutChip(icon = Icons.Default.Folder, label = "Folders", onClick = onFoldersClick)
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -420,6 +445,28 @@ private fun QuickActionCard(
             Text(text = title, style = MaterialTheme.typography.titleSmall, color = TextPrimary, maxLines = 1)
             Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1)
         }
+    }
+}
+
+@Composable
+internal fun ShortcutChip(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    tint: Color = AccentPrimary
+) {
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(SurfaceCard)
+            .border(1.dp, StrokeSubtle, CircleShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, color = TextPrimary)
     }
 }
 

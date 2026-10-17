@@ -7,6 +7,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
 import com.lordyhas.muzik.data.local.PlaylistEntity
 import com.lordyhas.muzik.data.model.Album
+import com.lordyhas.muzik.data.model.AlbumSort
+import com.lordyhas.muzik.data.model.ArtistSort
+import com.lordyhas.muzik.data.model.Folder
+import com.lordyhas.muzik.data.model.SearchResults
+import com.lordyhas.muzik.data.model.SongSort
 import com.lordyhas.muzik.data.model.Artist
 import com.lordyhas.muzik.data.model.Playlist
 import com.lordyhas.muzik.data.model.Song
@@ -18,7 +23,11 @@ import com.lordyhas.muzik.service.EqualizerSettings
 import com.lordyhas.muzik.service.MusicController
 import com.lordyhas.muzik.service.PlaybackSettings
 import com.lordyhas.muzik.service.SleepTimer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -131,8 +140,30 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     // ─────────────────────────────────────────────────────────────────────────
 
-    val filteredSongs: StateFlow<List<Song>> = combine(_songs, _searchQuery) { songList, query ->
-        if (query.isBlank()) {
+    // ─── Sorting (persisted) ──────────────────────────────────────────────────
+
+    private val _songSort = MutableStateFlow(loadEnum("song_sort", SongSort.TITLE))
+    val songSort: StateFlow<SongSort> = _songSort.asStateFlow()
+
+    private val _albumSort = MutableStateFlow(loadEnum("album_sort", AlbumSort.TITLE))
+    val albumSort: StateFlow<AlbumSort> = _albumSort.asStateFlow()
+
+    private val _artistSort = MutableStateFlow(loadEnum("artist_sort", ArtistSort.NAME))
+    val artistSort: StateFlow<ArtistSort> = _artistSort.asStateFlow()
+
+    fun setSongSort(sort: SongSort) { _songSort.value = sort; saveEnum("song_sort", sort) }
+    fun setAlbumSort(sort: AlbumSort) { _albumSort.value = sort; saveEnum("album_sort", sort) }
+    fun setArtistSort(sort: ArtistSort) { _artistSort.value = sort; saveEnum("artist_sort", sort) }
+
+    private inline fun <reified T : Enum<T>> loadEnum(key: String, default: T): T =
+        prefs.getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default
+
+    private fun saveEnum(key: String, value: Enum<*>) {
+        prefs.edit().putString(key, value.name).apply()
+    }
+
+    val filteredSongs: StateFlow<List<Song>> = combine(_songs, _searchQuery, _songSort) { songList, query, sort ->
+        val matching = if (query.isBlank()) {
             songList
         } else {
             val lowerQuery = query.trim().lowercase()
@@ -142,7 +173,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 it.album.lowercase().contains(lowerQuery)
             }
         }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        sort.apply(matching)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val albums: StateFlow<List<Album>> = _songs.map { songList ->
         songList.groupBy { it.album }
@@ -175,6 +207,56 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             }
             .sortedBy { it.name.lowercase() }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val sortedAlbums: StateFlow<List<Album>> = combine(albums, _albumSort) { list, sort -> sort.apply(list) }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val sortedArtists: StateFlow<List<Artist>> = combine(artists, _artistSort) { list, sort -> sort.apply(list) }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /** Folders that directly contain music, A–Z. */
+    val folders: StateFlow<List<Folder>> = _songs.map { songList ->
+        songList.filter { it.folderPath.isNotBlank() }
+            .groupBy { it.folderPath }
+            .map { (path, folderSongs) ->
+                Folder(
+                    path = path,
+                    name = path.substringAfterLast('/').ifBlank { path },
+                    songs = folderSongs.sortedBy { it.title.lowercase() }
+                )
+            }
+            .sortedBy { it.name.lowercase() }
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // ─── Global search ────────────────────────────────────────────────────────
+
+    private val _globalQuery = MutableStateFlow("")
+    val globalQuery: StateFlow<String> = _globalQuery.asStateFlow()
+
+    fun updateGlobalQuery(query: String) { _globalQuery.value = query }
+
+    @OptIn(FlowPreview::class)
+    val searchResults: StateFlow<SearchResults> = combine(
+        _globalQuery.debounce(150),
+        _songs,
+        albums,
+        artists,
+        playlists
+    ) { query, songList, albumList, artistList, playlistList ->
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) {
+            SearchResults()
+        } else {
+            SearchResults(
+                songs = songList.filter {
+                    it.title.lowercase().contains(q) || it.artist.lowercase().contains(q) || it.album.lowercase().contains(q)
+                },
+                albums = albumList.filter { it.title.lowercase().contains(q) || it.artist.lowercase().contains(q) },
+                artists = artistList.filter { it.name.lowercase().contains(q) },
+                playlists = playlistList.filter { it.name.lowercase().contains(q) }
+            )
+        }
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, SearchResults())
 
     val recentlyPlayedSongs: StateFlow<List<Song>> = combine(_songs, _recentSongIds) { songList, recentIds ->
         val songMap = songList.associateBy { it.id }
