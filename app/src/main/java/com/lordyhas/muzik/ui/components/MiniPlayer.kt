@@ -1,12 +1,15 @@
 package com.lordyhas.muzik.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +31,10 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +42,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lordyhas.muzik.data.model.Song
@@ -45,6 +55,8 @@ import com.lordyhas.muzik.ui.theme.TextPrimary
 import com.lordyhas.muzik.ui.theme.TextSecondary
 import com.lordyhas.muzik.ui.theme.TrackBackground
 import com.lordyhas.muzik.ui.theme.rememberArtworkColor
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @Composable
 fun MiniPlayer(
@@ -55,6 +67,7 @@ fun MiniPlayer(
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onClick: () -> Unit,
+    onSkipPrevious: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (song == null) return
@@ -64,6 +77,13 @@ fun MiniPlayer(
         (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
     } else 0f
     val shape = RoundedCornerShape(18.dp)
+
+    // Swipe the mini player left/right to skip tracks
+    val offsetX = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val thresholdPx = with(LocalDensity.current) { 72.dp.toPx() }
+    val currentNext by rememberUpdatedState(onSkipNext)
+    val currentPrevious by rememberUpdatedState(onSkipPrevious)
 
     Box(
         modifier = modifier
@@ -79,8 +99,29 @@ fun MiniPlayer(
             )
             .border(1.dp, StrokeSubtle, shape)
             .clickable(onClick = onClick)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        val x = offsetX.value
+                        scope.launch {
+                            if (x < -thresholdPx) currentNext() else if (x > thresholdPx) currentPrevious()
+                            offsetX.animateTo(0f, spring(dampingRatio = 0.7f))
+                        }
+                    },
+                    onDragCancel = { scope.launch { offsetX.animateTo(0f) } },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        scope.launch { offsetX.snapTo(offsetX.value + amount * 0.6f) }
+                    }
+                )
+            }
     ) {
-        Column {
+        Column(
+            modifier = Modifier.graphicsLayer {
+                translationX = offsetX.value
+                alpha = 1f - (abs(offsetX.value) / (thresholdPx * 3)).coerceIn(0f, 0.6f)
+            }
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
