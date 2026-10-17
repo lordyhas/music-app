@@ -5,6 +5,7 @@ import com.lordyhas.muzik.data.local.MuzikDatabase
 import com.lordyhas.muzik.data.local.PlaylistEntity
 import com.lordyhas.muzik.data.local.PlaylistSongEntity
 import com.lordyhas.muzik.data.local.PlaylistSongRow
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
@@ -16,7 +17,8 @@ import java.util.UUID
  */
 class PlaylistRepository(context: Context) {
 
-    private val dao = MuzikDatabase.getInstance(context).playlistDao()
+    private val db = MuzikDatabase.getInstance(context)
+    private val dao = db.playlistDao()
 
     /** Live stream of all playlists (metadata only, no songs resolved yet). */
     fun getAllPlaylists(): Flow<List<PlaylistEntity>> = dao.getAllPlaylists()
@@ -56,5 +58,14 @@ class PlaylistRepository(context: Context) {
 
     suspend fun removeSongFromPlaylist(playlistId: String, songId: Long) {
         dao.removeSongFromPlaylist(playlistId, songId)
+    }
+
+    /** Rewrites song positions so the playlist follows [orderedSongIds]. */
+    suspend fun reorder(playlistId: String, orderedSongIds: List<Long>) {
+        db.withTransaction {
+            orderedSongIds.forEachIndexed { index, songId ->
+                dao.updatePosition(playlistId, songId, index)
+            }
+        }
     }
 }

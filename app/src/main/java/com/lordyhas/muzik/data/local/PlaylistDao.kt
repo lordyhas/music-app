@@ -44,6 +44,9 @@ interface PlaylistDao {
     @Query("SELECT playlistId, songId FROM playlist_songs ORDER BY playlistId, position ASC")
     fun getAllPlaylistSongs(): Flow<List<PlaylistSongRow>>
 
+    @Query("UPDATE playlist_songs SET position = :position WHERE playlistId = :playlistId AND songId = :songId")
+    suspend fun updatePosition(playlistId: String, songId: Long, position: Int)
+
     /** Returns the max position value for a given playlist (to append new songs). */
     @Query("SELECT COALESCE(MAX(position), -1) FROM playlist_songs WHERE playlistId = :playlistId")
     suspend fun getMaxPosition(playlistId: String): Int

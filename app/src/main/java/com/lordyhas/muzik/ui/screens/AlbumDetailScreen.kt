@@ -61,6 +61,7 @@ fun AlbumDetailScreen(
 
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val likedIds by viewModel.likedSongIds.collectAsState()
 
     if (album == null) {
         DetailNotFound(message = "Album not found", onBack = onBackClick, modifier = modifier)
@@ -100,6 +101,8 @@ fun AlbumDetailScreen(
                 isPlaying = isPlaying && isSelected,
                 onClick = { viewModel.playAlbum(album, song) },
                 onAddToQueue = { viewModel.addToQueue(song) },
+                isLiked = song.id in likedIds,
+                onToggleLike = { viewModel.toggleLike(song) },
                 onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
                 onGoToArtist = { onGoToArtist(song.artist) },
                 onShowDetails = { viewModel.selectSongForDetails(song) },

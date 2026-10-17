@@ -53,6 +53,7 @@ fun TracksScreen(
     val totalSongs by viewModel.songs.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val likedIds by viewModel.likedSongIds.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val songSort by viewModel.songSort.collectAsState()
@@ -129,6 +130,8 @@ fun TracksScreen(
                         isPlaying = isPlaying && isSelected,
                         onClick = { viewModel.playSong(song) },
                         onAddToQueue = { viewModel.addToQueue(song) },
+                        isLiked = song.id in likedIds,
+                        onToggleLike = { viewModel.toggleLike(song) },
                         onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
                         onGoToArtist = { onGoToArtist(song.artist) },
                         onGoToAlbum = { onGoToAlbum(song.album) },
