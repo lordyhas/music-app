@@ -34,6 +34,7 @@ class MusicPlaybackService : MediaSessionService() {
 
     /** Song waiting to be counted as "played" once playback actually starts. */
     private var pendingPlayRecord: String? = null
+    private var progressSaverJob: Job? = null
 
     private val playerListener = object : Player.Listener {
         override fun onAudioSessionIdChanged(audioSessionId: Int) {
@@ -44,10 +45,17 @@ class MusicPlaybackService : MediaSessionService() {
             // Counted here (not in the UI) so plays are tracked even when the app is closed
             pendingPlayRecord = mediaItem?.mediaId
             if (exoPlayer?.playWhenReady == true) recordPendingPlay()
+            saveProgress()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying) recordPendingPlay()
+            if (isPlaying) {
+                recordPendingPlay()
+                startProgressSaver()
+            } else {
+                progressSaverJob?.cancel()
+                saveProgress()
+            }
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -104,6 +112,7 @@ class MusicPlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        saveProgress()
         serviceScope.cancel()
         PlaybackSettings.cancelSleepTimer()
         releaseEqualizer()
@@ -115,6 +124,28 @@ class MusicPlaybackService : MediaSessionService() {
         }
         exoPlayer = null
         super.onDestroy()
+    }
+
+    /** Keeps the saved session fresh while playing with the UI closed. */
+    private fun saveProgress() {
+        val player = exoPlayer ?: return
+        if (player.mediaItemCount == 0) return
+        PlaybackStateStore.saveProgress(
+            this,
+            songIds = (0 until player.mediaItemCount).mapNotNull { player.getMediaItemAt(it).mediaId.toLongOrNull() },
+            index = player.currentMediaItemIndex,
+            positionMs = player.currentPosition
+        )
+    }
+
+    private fun startProgressSaver() {
+        progressSaverJob?.cancel()
+        progressSaverJob = serviceScope.launch {
+            while (true) {
+                delay(15_000)
+                saveProgress()
+            }
+        }
     }
 
     private fun recordPendingPlay() {
