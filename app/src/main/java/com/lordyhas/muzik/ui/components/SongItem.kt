@@ -23,6 +23,8 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
@@ -71,6 +73,9 @@ fun SongItem(
     onShowDetails: (() -> Unit)? = null,
     showTrackNumber: Boolean = false,
     showArtwork: Boolean = true,
+    isLiked: Boolean = false,
+    onToggleLike: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
@@ -138,13 +143,24 @@ fun SongItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = "${song.artist} • ${song.formattedDuration()}",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isLiked) {
+                    Icon(
+                        Icons.Default.Favorite,
+                        contentDescription = "Liked",
+                        tint = AccentPrimary,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Text(
+                    text = "${song.artist} • ${song.formattedDuration()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(4.dp))
@@ -187,6 +203,14 @@ fun SongItem(
                     )
                 }
 
+                onToggleLike?.let {
+                    MenuItem(
+                        if (isLiked) "Remove from Liked Songs" else "Add to Liked Songs",
+                        if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        AccentPrimary,
+                        it
+                    )
+                }
                 onAddToQueue?.let { MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic, AccentPrimary, it) }
                 onAddToPlaylist?.let { MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd, AccentPrimary, it) }
                 onGoToArtist?.let { MenuItem("Go to artist", Icons.Default.Person, TextSecondary, it) }
@@ -195,6 +219,8 @@ fun SongItem(
                 onShowDetails?.let { MenuItem("Song details", Icons.Default.Info, TextSecondary, it) }
             }
         }
+
+        trailing?.invoke()
     }
 }
 
