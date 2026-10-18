@@ -30,6 +30,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -311,6 +313,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         importLegacyRecentHistory()
+
+        // Once both the library and the player connection are ready, restore the last session
+        viewModelScope.launch {
+            combine(_songs, musicController.isControllerReady) { songs, ready -> songs.takeIf { ready } }
+                .filterNotNull()
+                .first { it.isNotEmpty() }
+                .let { musicController.restoreOrSync(it) }
+        }
     }
 
     val recentlyPlayedAlbums: StateFlow<List<Album>> = combine(albums, recentlyPlayedSongs) { allAlbums, recentSongs ->
