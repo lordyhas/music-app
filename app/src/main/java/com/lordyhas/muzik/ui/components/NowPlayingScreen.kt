@@ -33,6 +33,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -117,6 +119,8 @@ fun NowPlayingScreen(
     playbackSpeed: Float,
     onSleepTimerClick: () -> Unit,
     onAudioEffectsClick: () -> Unit,
+    isLiked: Boolean,
+    onToggleLike: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -280,21 +284,26 @@ fun NowPlayingScreen(
 
                     // ── Title, Artist & Progress ─────────────────────────
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = song.title,
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
-                            color = TextPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = song.artist,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = TextPrimary.copy(alpha = 0.7f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = song.title,
+                                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
+                                    color = TextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = song.artist,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = TextPrimary.copy(alpha = 0.7f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            LikeButton(isLiked = isLiked, accent = accent, onClick = onToggleLike)
+                        }
 
                         Spacer(modifier = Modifier.height(14.dp))
 
@@ -753,6 +762,33 @@ private fun QueueSongRow(
         if (handleModifier != null) {
             DragHandleIcon(modifier = handleModifier)
         }
+    }
+}
+
+/** Heart that pops when toggled on. */
+@Composable
+private fun LikeButton(isLiked: Boolean, accent: Color, onClick: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
+    val scale by animateFloatAsState(
+        targetValue = if (isLiked) 1f else 0.9f,
+        animationSpec = spring(dampingRatio = 0.35f, stiffness = 400f),
+        label = "like_scale"
+    )
+    IconButton(
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+        },
+        modifier = Modifier.size(48.dp)
+    ) {
+        Icon(
+            imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            contentDescription = if (isLiked) "Remove from Liked Songs" else "Add to Liked Songs",
+            tint = if (isLiked) accent else TextPrimary.copy(alpha = 0.8f),
+            modifier = Modifier
+                .size(28.dp)
+                .scale(scale)
+        )
     }
 }
 

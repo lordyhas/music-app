@@ -72,6 +72,7 @@ fun SearchScreen(
     val results by viewModel.searchResults.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val likedIds by viewModel.likedSongIds.collectAsState()
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
@@ -181,6 +182,8 @@ fun SearchScreen(
                             isPlaying = isPlaying && isSelected,
                             onClick = { viewModel.playSong(song, results.songs) },
                             onAddToQueue = { viewModel.addToQueue(song) },
+                            isLiked = song.id in likedIds,
+                            onToggleLike = { viewModel.toggleLike(song) },
                             onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
                             onGoToArtist = { onArtistClick(song.artist) },
                             onGoToAlbum = { onAlbumClick(song.album) },

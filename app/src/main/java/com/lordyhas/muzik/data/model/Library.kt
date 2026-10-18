@@ -49,6 +49,19 @@ enum class ArtistSort(val label: String, val alphabetical: Boolean) {
     }
 }
 
+/** Auto-generated playlists built from likes and listening history. */
+enum class SmartPlaylistType(val title: String, val description: String) {
+    LIKED("Liked Songs", "Songs you hearted"),
+    MOST_PLAYED("Most Played", "Your all-time favorites"),
+    RECENTLY_ADDED("Recently Added", "Newest music on your device"),
+    REDISCOVER("Rediscover", "Old favorites you haven't played in a while")
+}
+
+data class SmartPlaylist(
+    val type: SmartPlaylistType,
+    val songs: List<Song>
+)
+
 /** A device folder that directly contains music. */
 data class Folder(
     val path: String,

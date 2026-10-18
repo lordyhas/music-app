@@ -60,6 +60,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.lordyhas.muzik.data.model.SmartPlaylistType
 import com.lordyhas.muzik.ui.components.AddToPlaylistSheet
 import com.lordyhas.muzik.ui.components.AudioEffectsSheet
 import com.lordyhas.muzik.ui.components.SleepTimerSheet
@@ -114,6 +115,7 @@ fun MainAppScreen(
     val playlists by viewModel.playlists.collectAsState()
     val showCreatePlaylistDialog by viewModel.showCreatePlaylistDialog.collectAsState()
     val sleepTimer by viewModel.sleepTimer.collectAsState()
+    val likedIds by viewModel.likedSongIds.collectAsState()
     val playbackSpeed by viewModel.playbackSpeed.collectAsState()
     val equalizer by viewModel.equalizer.collectAsState()
     val equalizerInfo by viewModel.equalizerInfo.collectAsState()
@@ -304,7 +306,8 @@ fun MainAppScreen(
                             onSeeAllAlbums = { navigateToTab(NavigationTab.ALBUMS) },
                             onSeeAllArtists = { navigateToTab(NavigationTab.ARTISTS) },
                             onSearchClick = { navController.navigate("search") },
-                            onFoldersClick = { navController.navigate("folders") }
+                            onFoldersClick = { navController.navigate("folders") },
+                            onSmartPlaylistClick = { type -> navController.navigate("smart/${type.name}") }
                         )
                     }
 
@@ -333,6 +336,7 @@ fun MainAppScreen(
                     composable(NavigationTab.PLAYLISTS.route) {
                         PlaylistsScreen(
                             viewModel = viewModel,
+                            onSmartPlaylistClick = { type -> navController.navigate("smart/${type.name}") },
                             onPlaylistClick = { id -> navigateToPlaylist(id) }
                         )
                     }
@@ -347,6 +351,22 @@ fun MainAppScreen(
                             onArtistClick = { name -> navigateToArtist(name) },
                             onPlaylistClick = { id -> navigateToPlaylist(id) },
                             onFoldersClick = { navController.navigate("folders") }
+                        )
+                    }
+
+                    composable(
+                        route = "smart/{type}",
+                        arguments = listOf(navArgument("type") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val type = SmartPlaylistType.entries.firstOrNull {
+                            it.name == backStackEntry.arguments?.getString("type")
+                        } ?: SmartPlaylistType.LIKED
+                        SmartPlaylistScreen(
+                            type = type,
+                            viewModel = viewModel,
+                            onBackClick = { safePopBack() },
+                            onGoToArtist = { name -> navigateToArtist(name) },
+                            onGoToAlbum = { title -> navigateToAlbum(title) }
                         )
                     }
 
@@ -449,6 +469,8 @@ fun MainAppScreen(
                 playbackSpeed = playbackSpeed,
                 onSleepTimerClick = { showSleepTimerSheet = true },
                 onAudioEffectsClick = { showAudioEffectsSheet = true },
+                isLiked = currentSong?.id?.let { it in likedIds } == true,
+                onToggleLike = { currentSong?.let { viewModel.toggleLike(it) } },
                 onDismiss = { viewModel.setShowNowPlaying(false) }
             )
         }

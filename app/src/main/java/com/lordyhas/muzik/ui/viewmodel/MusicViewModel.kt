@@ -11,11 +11,14 @@ import com.lordyhas.muzik.data.model.AlbumSort
 import com.lordyhas.muzik.data.model.ArtistSort
 import com.lordyhas.muzik.data.model.Folder
 import com.lordyhas.muzik.data.model.SearchResults
+import com.lordyhas.muzik.data.model.SmartPlaylist
+import com.lordyhas.muzik.data.model.SmartPlaylistType
 import com.lordyhas.muzik.data.model.SongSort
 import com.lordyhas.muzik.data.model.Artist
 import com.lordyhas.muzik.data.model.Playlist
 import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.data.model.sortedForAlbum
+import com.lordyhas.muzik.data.repository.LibraryRepository
 import com.lordyhas.muzik.data.repository.MusicRepository
 import com.lordyhas.muzik.data.repository.PlaylistRepository
 import com.lordyhas.muzik.service.EqualizerInfo
@@ -81,7 +84,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val userQueue: StateFlow<List<Song>> = musicController.userQueueList
     val contextQueue: StateFlow<List<Song>> = musicController.contextQueueList
 
-    private val _recentSongIds = MutableStateFlow<List<Long>>(loadRecentSongIds())
+    private val libraryRepository = LibraryRepository(application)
+
+    // Listening history is recorded by the playback service into Room
+    private val playStats = libraryRepository.getPlayStats()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val likedEntities = libraryRepository.getLikedSongs()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val likedSongIds: StateFlow<Set<Long>> = likedEntities
+        .map { list -> list.map { it.songId }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     // Detail sheets
     private val _selectedAlbum = MutableStateFlow<Album?>(null)
@@ -258,10 +272,46 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, SearchResults())
 
-    val recentlyPlayedSongs: StateFlow<List<Song>> = combine(_songs, _recentSongIds) { songList, recentIds ->
+    val recentlyPlayedSongs: StateFlow<List<Song>> = combine(_songs, playStats) { songList, stats ->
         val songMap = songList.associateBy { it.id }
-        recentIds.mapNotNull { songMap[it] }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        stats.filter { it.lastPlayedAt > 0 }
+            .sortedByDescending { it.lastPlayedAt }
+            .mapNotNull { songMap[it.songId] }
+            .take(30)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /** Liked Songs, Most Played, Recently Added and Rediscover, derived live from Room + MediaStore. */
+    val smartPlaylists: StateFlow<List<SmartPlaylist>> = combine(_songs, playStats, likedEntities) { songList, stats, liked ->
+        val songMap = songList.associateBy { it.id }
+        val monthAgo = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+        listOf(
+            SmartPlaylist(SmartPlaylistType.LIKED, liked.mapNotNull { songMap[it.songId] }),
+            SmartPlaylist(
+                SmartPlaylistType.MOST_PLAYED,
+                stats.filter { it.playCount > 0 }.sortedByDescending { it.playCount }.mapNotNull { songMap[it.songId] }.take(50)
+            ),
+            SmartPlaylist(
+                SmartPlaylistType.RECENTLY_ADDED,
+                songList.filter { it.dateAdded > 0 }.sortedByDescending { it.dateAdded }.take(50)
+            ),
+            SmartPlaylist(
+                SmartPlaylistType.REDISCOVER,
+                stats.filter { it.playCount > 0 && it.lastPlayedAt in 1 until monthAgo }
+                    .sortedByDescending { it.playCount }
+                    .mapNotNull { songMap[it.songId] }
+                    .take(50)
+            )
+        )
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    fun toggleLike(song: Song) {
+        val liked = song.id in likedSongIds.value
+        viewModelScope.launch { libraryRepository.setLiked(song.id, !liked) }
+    }
+
+    init {
+        importLegacyRecentHistory()
+    }
 
     val recentlyPlayedAlbums: StateFlow<List<Album>> = combine(albums, recentlyPlayedSongs) { allAlbums, recentSongs ->
         val recentAlbumNames = recentSongs.map { it.album }.distinct()
@@ -326,7 +376,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             musicController.playSongList(listOf(song), 0)
         }
-        addToRecentHistory(song.id)
     }
 
     fun playAlbum(album: Album, startSong: Song? = null) {
@@ -356,7 +405,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         if (all.isNotEmpty()) {
             val shuffled = all.shuffled()
             musicController.playSongList(shuffled, 0)
-            addToRecentHistory(shuffled.first().id)
         }
     }
 
@@ -466,24 +514,26 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.removeSongFromPlaylist(playlistId, songId) }
     }
 
+    /** Moves [fromSongId] to where [toSongId] currently sits in the playlist. */
+    fun moveSongInPlaylist(playlist: Playlist, fromSongId: Long, toSongId: Long) {
+        val ids = playlist.songIds.toMutableList()
+        val from = ids.indexOf(fromSongId)
+        val to = ids.indexOf(toSongId)
+        if (from < 0 || to < 0 || from == to) return
+        ids.add(to, ids.removeAt(from))
+        viewModelScope.launch { playlistRepository.reorder(playlist.id, ids) }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
 
-    private fun addToRecentHistory(songId: Long) {
-        val current = _recentSongIds.value.toMutableList()
-        current.remove(songId)
-        current.add(0, songId)
-        val trimmed = current.take(30)
-        _recentSongIds.value = trimmed
-        saveRecentSongIds(trimmed)
-    }
-
-    private fun loadRecentSongIds(): List<Long> {
-        val raw = prefs.getString("recent_song_ids", null) ?: return emptyList()
-        return raw.split(",").mapNotNull { it.trim().toLongOrNull() }
-    }
-
-    private fun saveRecentSongIds(ids: List<Long>) {
-        prefs.edit().putString("recent_song_ids", ids.joinToString(",")).apply()
+    /** Moves the pre-Room "recently played" list from SharedPreferences into play stats, once. */
+    private fun importLegacyRecentHistory() {
+        val raw = prefs.getString("recent_song_ids", null) ?: return
+        val ids = raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        viewModelScope.launch {
+            libraryRepository.importRecentHistory(ids)
+            prefs.edit().remove("recent_song_ids").apply()
+        }
     }
 
     override fun onCleared() {

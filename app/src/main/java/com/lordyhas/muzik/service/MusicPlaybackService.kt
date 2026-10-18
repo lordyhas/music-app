@@ -5,12 +5,14 @@ import android.content.Intent
 import android.media.audiofx.Equalizer
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.lordyhas.muzik.MainActivity
+import com.lordyhas.muzik.data.repository.LibraryRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,10 +30,24 @@ class MusicPlaybackService : MediaSessionService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var sleepJob: Job? = null
+    private lateinit var libraryRepository: LibraryRepository
+
+    /** Song waiting to be counted as "played" once playback actually starts. */
+    private var pendingPlayRecord: String? = null
 
     private val playerListener = object : Player.Listener {
         override fun onAudioSessionIdChanged(audioSessionId: Int) {
             attachEqualizer(audioSessionId)
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // Counted here (not in the UI) so plays are tracked even when the app is closed
+            pendingPlayRecord = mediaItem?.mediaId
+            if (exoPlayer?.playWhenReady == true) recordPendingPlay()
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) recordPendingPlay()
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -48,6 +64,7 @@ class MusicPlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         PlaybackSettings.init(this)
+        libraryRepository = LibraryRepository(this)
 
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -98,6 +115,18 @@ class MusicPlaybackService : MediaSessionService() {
         }
         exoPlayer = null
         super.onDestroy()
+    }
+
+    private fun recordPendingPlay() {
+        val songId = pendingPlayRecord?.toLongOrNull() ?: return
+        pendingPlayRecord = null
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                libraryRepository.recordPlay(songId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     // ─── Settings → player ──────────────────────────────────────────────────
