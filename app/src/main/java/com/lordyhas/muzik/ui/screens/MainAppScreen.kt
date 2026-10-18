@@ -302,7 +302,9 @@ fun MainAppScreen(
                             onAlbumClick = { title -> navigateToAlbum(title) },
                             onArtistClick = { name -> navigateToArtist(name) },
                             onSeeAllAlbums = { navigateToTab(NavigationTab.ALBUMS) },
-                            onSeeAllArtists = { navigateToTab(NavigationTab.ARTISTS) }
+                            onSeeAllArtists = { navigateToTab(NavigationTab.ARTISTS) },
+                            onSearchClick = { navController.navigate("search") },
+                            onFoldersClick = { navController.navigate("folders") }
                         )
                     }
 
@@ -336,6 +338,41 @@ fun MainAppScreen(
                     }
 
                     // ─── Detail Destinations ─────────────────────────────────────────
+
+                    composable("search") {
+                        SearchScreen(
+                            viewModel = viewModel,
+                            onBackClick = { safePopBack() },
+                            onAlbumClick = { title -> navigateToAlbum(title) },
+                            onArtistClick = { name -> navigateToArtist(name) },
+                            onPlaylistClick = { id -> navigateToPlaylist(id) },
+                            onFoldersClick = { navController.navigate("folders") }
+                        )
+                    }
+
+                    composable("folders") {
+                        FoldersScreen(
+                            viewModel = viewModel,
+                            onBackClick = { safePopBack() },
+                            onFolderClick = { path ->
+                                navController.navigate("folder/" + URLEncoder.encode(path, StandardCharsets.UTF_8.toString()))
+                            }
+                        )
+                    }
+
+                    composable(
+                        route = "folder/{folderPath}",
+                        arguments = listOf(navArgument("folderPath") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val encoded = backStackEntry.arguments?.getString("folderPath").orEmpty()
+                        FolderDetailScreen(
+                            folderPath = URLDecoder.decode(encoded, StandardCharsets.UTF_8.toString()),
+                            viewModel = viewModel,
+                            onBackClick = { safePopBack() },
+                            onGoToArtist = { name -> navigateToArtist(name) },
+                            onGoToAlbum = { title -> navigateToAlbum(title) }
+                        )
+                    }
 
                     composable(
                         route = "album/{albumTitle}",
