@@ -17,7 +17,7 @@ import com.lordyhas.muzik.data.model.SongSort
 import com.lordyhas.muzik.data.model.Artist
 import com.lordyhas.muzik.data.model.Playlist
 import com.lordyhas.muzik.data.model.Song
-import com.lordyhas.muzik.data.model.sortedForAlbum
+import com.lordyhas.muzik.data.model.groupIntoAlbums
 import com.lordyhas.muzik.data.repository.LibraryRepository
 import com.lordyhas.muzik.data.repository.LyricsRepository
 import com.lordyhas.muzik.data.repository.LyricsState
@@ -200,26 +200,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val albums: StateFlow<List<Album>> = _songs.map { songList ->
-        songList.groupBy { it.album }
-            .map { (albumTitle, albumSongs) ->
-                val sortedSongs = albumSongs.sortedForAlbum()
-                val first = sortedSongs.first()
-                Album(
-                    id = first.albumId,
-                    title = albumTitle,
-                    artist = first.artist,
-                    albumArtUri = sortedSongs.firstOrNull { it.albumArtUri != null }?.albumArtUri,
-                    songCount = sortedSongs.size,
-                    songs = sortedSongs
-                )
-            }
-            .sortedBy { it.title.lowercase() }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        songList.groupIntoAlbums()
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val artists: StateFlow<List<Artist>> = _songs.map { songList ->
         songList.groupBy { it.artist }
             .map { (artistName, artistSongs) ->
-                val albumCount = artistSongs.map { it.album }.distinct().size
+                val albumCount = artistSongs.map { it.albumId }.distinct().size
                 Artist(
                     name = artistName,
                     songCount = artistSongs.size,
@@ -331,9 +318,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     val recentlyPlayedAlbums: StateFlow<List<Album>> = combine(albums, recentlyPlayedSongs) { allAlbums, recentSongs ->
-        val recentAlbumNames = recentSongs.map { it.album }.distinct()
-        val albumMap = allAlbums.associateBy { it.title }
-        val recents = recentAlbumNames.mapNotNull { albumMap[it] }
+        val recentAlbumIds = recentSongs.map { it.albumId }.distinct()
+        val albumMap = allAlbums.associateBy { it.id }
+        val recents = recentAlbumIds.mapNotNull { albumMap[it] }
         if (recents.isNotEmpty()) recents else allAlbums.take(6)
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -359,6 +346,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 albumArtUri = mediaItem.mediaMetadata.artworkUri
             )
         }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, null)
+
+    private val _playingPlaylistId = MutableStateFlow<String?>(null)
+
+    /** The playlist the queue was started from, as long as the current song still belongs to it. */
+    val playingPlaylistId: StateFlow<String?> = combine(_playingPlaylistId, currentSong, playlists) { id, song, lists ->
+        id?.takeIf { song != null && lists.firstOrNull { it.id == id }?.songIds?.contains(song.id) == true }
     }.stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     val isPlaying = musicController.isPlaying
@@ -409,6 +403,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playSong(song: Song, playlist: List<Song>? = null) {
+        _playingPlaylistId.value = null
         val currentPlaylist = playlist ?: filteredSongs.value.ifEmpty { _songs.value }
         val index = currentPlaylist.indexOfFirst { it.id == song.id }
         if (index != -1) {
@@ -432,17 +427,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun playPlaylist(playlist: Playlist, startSong: Song? = null) {
-        val songs = playlist.songs
+    fun playPlaylist(playlist: Playlist, startSong: Song? = null, shuffle: Boolean = false) {
+        val songs = if (shuffle) playlist.songs.shuffled() else playlist.songs
         if (songs.isNotEmpty()) {
             val targetSong = startSong ?: songs.first()
             playSong(targetSong, songs)
+            _playingPlaylistId.value = playlist.id
         }
     }
 
     fun playRandom() {
         val all = _songs.value
         if (all.isNotEmpty()) {
+            _playingPlaylistId.value = null
             val shuffled = all.shuffled()
             musicController.playSongList(shuffled, 0)
         }
@@ -486,29 +483,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             ?: Artist(
                 name = artistName,
                 songCount = _songs.value.count { it.artist.equals(artistName, ignoreCase = true) },
-                albumCount = _songs.value.filter { it.artist.equals(artistName, ignoreCase = true) }.map { it.album }.distinct().size,
+                albumCount = _songs.value.filter { it.artist.equals(artistName, ignoreCase = true) }.map { it.albumId }.distinct().size,
                 songs = _songs.value.filter { it.artist.equals(artistName, ignoreCase = true) }
             )
         _selectedArtist.value = target
     }
 
-    fun navigateToAlbum(albumTitle: String) {
-        val target = albums.value.firstOrNull { it.title.equals(albumTitle, ignoreCase = true) }
-            ?: albums.value.firstOrNull { it.title.contains(albumTitle, ignoreCase = true) }
-            ?: run {
-                val albumSongs = _songs.value.filter { it.album.equals(albumTitle, ignoreCase = true) }
-                if (albumSongs.isNotEmpty()) {
-                    Album(
-                        id = albumSongs.first().albumId,
-                        title = albumTitle,
-                        artist = albumSongs.first().artist,
-                        albumArtUri = albumSongs.firstOrNull { it.albumArtUri != null }?.albumArtUri,
-                        songCount = albumSongs.size,
-                        songs = albumSongs
-                    )
-                } else null
-            }
-        _selectedAlbum.value = target
+    fun navigateToAlbum(albumId: Long) {
+        _selectedAlbum.value = albums.value.firstOrNull { it.id == albumId }
     }
 
     fun selectAlbum(album: Album?) { _selectedAlbum.value = album }

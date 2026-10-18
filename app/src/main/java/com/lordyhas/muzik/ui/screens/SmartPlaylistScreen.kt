@@ -28,7 +28,7 @@ fun SmartPlaylistScreen(
     viewModel: MusicViewModel,
     onBackClick: () -> Unit,
     onGoToArtist: (String) -> Unit,
-    onGoToAlbum: (String) -> Unit,
+    onGoToAlbum: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     BackHandler(enabled = true) { onBackClick() }
@@ -88,7 +88,7 @@ fun SmartPlaylistScreen(
                     onToggleLike = { viewModel.toggleLike(song) },
                     onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
                     onGoToArtist = { onGoToArtist(song.artist) },
-                    onGoToAlbum = { onGoToAlbum(song.album) },
+                    onGoToAlbum = { onGoToAlbum(song.albumId) },
                     onShowDetails = { viewModel.selectSongForDetails(song) },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )

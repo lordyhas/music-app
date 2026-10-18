@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.ui.theme.AccentPrimary
@@ -221,6 +223,24 @@ fun SongItem(
         }
 
         trailing?.invoke()
+    }
+}
+
+/** Round chip with [EqualizerBars], laid over a cover to mark the album/artist/playlist playing now. */
+@Composable
+fun NowPlayingBadge(
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+    size: Dp = 28.dp
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.65f)),
+        contentAlignment = Alignment.Center
+    ) {
+        EqualizerBars(isAnimating = isPlaying, modifier = Modifier.size(size * 0.5f))
     }
 }
 

@@ -59,6 +59,8 @@ fun PlaylistsScreen(
     val songPendingAddToPlaylist by viewModel.songPendingAddToPlaylist.collectAsState()
     val playlistPendingRename by viewModel.playlistPendingRename.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val playingPlaylistId by viewModel.playingPlaylistId.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
 
     Box(
         modifier = modifier
@@ -119,6 +121,8 @@ fun PlaylistsScreen(
                         items(playlists, key = { it.id }) { playlist ->
                             PlaylistCard(
                                 playlist = playlist,
+                                isCurrent = playlist.id == playingPlaylistId,
+                                isPlaying = isPlaying,
                                 onClick = { onPlaylistClick(playlist.id) },
                                 onRename = { viewModel.setPlaylistPendingRename(playlist) },
                                 onDelete = { viewModel.deletePlaylist(playlist.id) }

@@ -59,7 +59,9 @@ fun PlaylistCard(
     onClick: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isCurrent: Boolean = false,
+    isPlaying: Boolean = false
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -71,14 +73,24 @@ fun PlaylistCard(
             .clickable(onClick = onClick)
             .padding(4.dp)
     ) {
-        PlaylistCollage(
-            playlist = playlist,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, StrokeSubtle, RoundedCornerShape(16.dp))
-        )
+        Box {
+            PlaylistCollage(
+                playlist = playlist,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, if (isCurrent) AccentPrimary else StrokeSubtle, RoundedCornerShape(16.dp))
+            )
+            if (isCurrent) {
+                NowPlayingBadge(
+                    isPlaying = isPlaying,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -92,7 +104,7 @@ fun PlaylistCard(
                 Text(
                     text = playlist.name,
                     style = MaterialTheme.typography.titleSmall,
-                    color = TextPrimary,
+                    color = if (isCurrent) AccentPrimary else TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

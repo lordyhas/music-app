@@ -81,7 +81,7 @@ import java.util.Calendar
 @Composable
 fun HomeScreen(
     viewModel: MusicViewModel,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (Long) -> Unit,
     onArtistClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     onSeeAllAlbums: () -> Unit = {},
@@ -95,6 +95,8 @@ fun HomeScreen(
     val recentAlbums by viewModel.recentlyPlayedAlbums.collectAsState()
     val recentArtists by viewModel.recentlyPlayedArtists.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val currentSong by viewModel.currentSong.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
 
     val greeting = greetingForNow()
     val heroSong = recentSongs.firstOrNull() ?: songs.firstOrNull()
@@ -257,7 +259,9 @@ fun HomeScreen(
                             items(recentAlbums, key = { it.title + it.id }) { album ->
                                 AlbumCard(
                                     album = album,
-                                    onClick = { onAlbumClick(album.title) },
+                                    isCurrent = currentSong?.albumId == album.id,
+                                    isPlaying = isPlaying,
+                                    onClick = { onAlbumClick(album.id) },
                                     modifier = Modifier.width(150.dp)
                                 )
                             }
@@ -273,7 +277,12 @@ fun HomeScreen(
                             modifier = Modifier.padding(vertical = 6.dp)
                         ) {
                             items(recentArtists, key = { it.name }) { artist ->
-                                ArtistCard(artist = artist, onClick = { onArtistClick(artist.name) })
+                                ArtistCard(
+                                    artist = artist,
+                                    isCurrent = currentSong?.artist == artist.name,
+                                    isPlaying = isPlaying,
+                                    onClick = { onArtistClick(artist.name) }
+                                )
                             }
                         }
                     }

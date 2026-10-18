@@ -187,9 +187,8 @@ fun MainAppScreen(
         }
     }
 
-    fun navigateToAlbum(albumTitle: String) {
-        val encoded = URLEncoder.encode(albumTitle, StandardCharsets.UTF_8.toString())
-        navController.navigate("album/$encoded")
+    fun navigateToAlbum(albumId: Long) {
+        navController.navigate("album/$albumId")
     }
 
     fun navigateToArtist(artistName: String) {
@@ -303,7 +302,7 @@ fun MainAppScreen(
                     composable(NavigationTab.HOME.route) {
                         HomeScreen(
                             viewModel = viewModel,
-                            onAlbumClick = { title -> navigateToAlbum(title) },
+                            onAlbumClick = { id -> navigateToAlbum(id) },
                             onArtistClick = { name -> navigateToArtist(name) },
                             onSeeAllAlbums = { navigateToTab(NavigationTab.ALBUMS) },
                             onSeeAllArtists = { navigateToTab(NavigationTab.ARTISTS) },
@@ -317,14 +316,14 @@ fun MainAppScreen(
                         TracksScreen(
                             viewModel = viewModel,
                             onGoToArtist = { name -> navigateToArtist(name) },
-                            onGoToAlbum = { title -> navigateToAlbum(title) }
+                            onGoToAlbum = { id -> navigateToAlbum(id) }
                         )
                     }
 
                     composable(NavigationTab.ALBUMS.route) {
                         AlbumsScreen(
                             viewModel = viewModel,
-                            onAlbumClick = { title -> navigateToAlbum(title) }
+                            onAlbumClick = { id -> navigateToAlbum(id) }
                         )
                     }
 
@@ -349,7 +348,7 @@ fun MainAppScreen(
                         SearchScreen(
                             viewModel = viewModel,
                             onBackClick = { safePopBack() },
-                            onAlbumClick = { title -> navigateToAlbum(title) },
+                            onAlbumClick = { id -> navigateToAlbum(id) },
                             onArtistClick = { name -> navigateToArtist(name) },
                             onPlaylistClick = { id -> navigateToPlaylist(id) },
                             onFoldersClick = { navController.navigate("folders") }
@@ -368,7 +367,7 @@ fun MainAppScreen(
                             viewModel = viewModel,
                             onBackClick = { safePopBack() },
                             onGoToArtist = { name -> navigateToArtist(name) },
-                            onGoToAlbum = { title -> navigateToAlbum(title) }
+                            onGoToAlbum = { id -> navigateToAlbum(id) }
                         )
                     }
 
@@ -392,18 +391,16 @@ fun MainAppScreen(
                             viewModel = viewModel,
                             onBackClick = { safePopBack() },
                             onGoToArtist = { name -> navigateToArtist(name) },
-                            onGoToAlbum = { title -> navigateToAlbum(title) }
+                            onGoToAlbum = { id -> navigateToAlbum(id) }
                         )
                     }
 
                     composable(
-                        route = "album/{albumTitle}",
-                        arguments = listOf(navArgument("albumTitle") { type = NavType.StringType })
+                        route = "album/{albumId}",
+                        arguments = listOf(navArgument("albumId") { type = NavType.LongType })
                     ) { backStackEntry ->
-                        val encodedTitle = backStackEntry.arguments?.getString("albumTitle").orEmpty()
-                        val albumTitle = URLDecoder.decode(encodedTitle, StandardCharsets.UTF_8.toString())
                         AlbumDetailScreen(
-                            albumTitle = albumTitle,
+                            albumId = backStackEntry.arguments?.getLong("albumId") ?: 0L,
                             viewModel = viewModel,
                             onBackClick = { safePopBack() },
                             onGoToArtist = { name -> navigateToArtist(name) }
@@ -420,7 +417,7 @@ fun MainAppScreen(
                             artistName = artistName,
                             viewModel = viewModel,
                             onBackClick = { safePopBack() },
-                            onGoToAlbum = { title -> navigateToAlbum(title) }
+                            onGoToAlbum = { id -> navigateToAlbum(id) }
                         )
                     }
 
@@ -435,7 +432,7 @@ fun MainAppScreen(
                             viewModel = viewModel,
                             onBackClick = { safePopBack() },
                             onGoToArtist = { name -> navigateToArtist(name) },
-                            onGoToAlbum = { title -> navigateToAlbum(title) }
+                            onGoToAlbum = { id -> navigateToAlbum(id) }
                         )
                     }
                 }

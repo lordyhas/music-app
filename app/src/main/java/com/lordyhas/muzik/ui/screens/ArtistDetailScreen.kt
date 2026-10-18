@@ -33,7 +33,7 @@ fun ArtistDetailScreen(
     artistName: String,
     viewModel: MusicViewModel,
     onBackClick: () -> Unit,
-    onGoToAlbum: (String) -> Unit,
+    onGoToAlbum: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     BackHandler(enabled = true) {
@@ -56,8 +56,8 @@ fun ArtistDetailScreen(
 
     val songs = artist.songs
     val artistAlbums = remember(songs, allAlbums) {
-        val titles = songs.map { it.album }.toSet()
-        allAlbums.filter { it.title in titles }
+        val albumIds = songs.map { it.albumId }.toSet()
+        allAlbums.filter { it.id in albumIds }
     }
 
     DetailScaffold(title = artist.name, onBack = onBackClick, modifier = modifier) {
@@ -87,7 +87,9 @@ fun ArtistDetailScreen(
                     items(artistAlbums, key = { it.title + it.id }) { album ->
                         AlbumCard(
                             album = album,
-                            onClick = { onGoToAlbum(album.title) },
+                            isCurrent = currentSong?.albumId == album.id,
+                            isPlaying = isPlaying,
+                            onClick = { onGoToAlbum(album.id) },
                             modifier = Modifier.width(150.dp)
                         )
                     }
@@ -110,7 +112,7 @@ fun ArtistDetailScreen(
                 isLiked = song.id in likedIds,
                 onToggleLike = { viewModel.toggleLike(song) },
                 onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
-                onGoToAlbum = { onGoToAlbum(song.album) },
+                onGoToAlbum = { onGoToAlbum(song.albumId) },
                 onShowDetails = { viewModel.selectSongForDetails(song) },
                 modifier = Modifier.padding(horizontal = 12.dp)
             )

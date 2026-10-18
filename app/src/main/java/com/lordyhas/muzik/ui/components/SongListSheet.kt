@@ -78,7 +78,7 @@ fun SongListSheet(
     onAddToPlaylist: ((Song) -> Unit)? = null,
     onRemoveFromPlaylist: ((Song) -> Unit)? = null,
     onGoToArtist: ((String) -> Unit)? = null,
-    onGoToAlbum: ((String) -> Unit)? = null,
+    onGoToAlbum: ((Long) -> Unit)? = null,
     onShowDetails: ((Song) -> Unit)? = null,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 ) {
@@ -256,7 +256,7 @@ fun SongListSheet(
                         onAddToPlaylist = if (onAddToPlaylist != null) { { onAddToPlaylist(song) } } else null,
                         onRemoveFromPlaylist = if (onRemoveFromPlaylist != null) { { onRemoveFromPlaylist(song) } } else null,
                         onGoToArtist = if (onGoToArtist != null) { { onGoToArtist(song.artist) } } else null,
-                        onGoToAlbum = if (onGoToAlbum != null) { { onGoToAlbum(song.album) } } else null,
+                        onGoToAlbum = if (onGoToAlbum != null) { { onGoToAlbum(song.albumId) } } else null,
                         onShowDetails = if (onShowDetails != null) { { onShowDetails(song) } } else null
                     )
                 }

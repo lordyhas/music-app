@@ -62,7 +62,7 @@ import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
 fun SearchScreen(
     viewModel: MusicViewModel,
     onBackClick: () -> Unit,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (Long) -> Unit,
     onArtistClick: (String) -> Unit,
     onPlaylistClick: (String) -> Unit,
     onFoldersClick: () -> Unit,
@@ -139,7 +139,12 @@ fun SearchScreen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             items(results.artists, key = { it.name }) { artist ->
-                                ArtistCard(artist = artist, onClick = { onArtistClick(artist.name) })
+                                ArtistCard(
+                                    artist = artist,
+                                    isCurrent = currentSong?.artist == artist.name,
+                                    isPlaying = isPlaying,
+                                    onClick = { onArtistClick(artist.name) }
+                                )
                             }
                         }
                     }
@@ -155,7 +160,9 @@ fun SearchScreen(
                             items(results.albums, key = { it.title + it.id }) { album ->
                                 AlbumCard(
                                     album = album,
-                                    onClick = { onAlbumClick(album.title) },
+                                    isCurrent = currentSong?.albumId == album.id,
+                                    isPlaying = isPlaying,
+                                    onClick = { onAlbumClick(album.id) },
                                     modifier = Modifier.width(140.dp)
                                 )
                             }
@@ -186,7 +193,7 @@ fun SearchScreen(
                             onToggleLike = { viewModel.toggleLike(song) },
                             onAddToPlaylist = { viewModel.setSongPendingAddToPlaylist(song) },
                             onGoToArtist = { onArtistClick(song.artist) },
-                            onGoToAlbum = { onAlbumClick(song.album) },
+                            onGoToAlbum = { onAlbumClick(song.albumId) },
                             onShowDetails = { viewModel.selectSongForDetails(song) },
                             modifier = Modifier.padding(horizontal = 12.dp)
                         )
