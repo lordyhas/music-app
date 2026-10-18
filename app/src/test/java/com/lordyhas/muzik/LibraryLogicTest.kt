@@ -1,5 +1,8 @@
 package com.lordyhas.muzik
 
+import android.net.FakeUri
+import com.lordyhas.muzik.data.model.Song
+import com.lordyhas.muzik.data.model.groupIntoAlbums
 import com.lordyhas.muzik.data.model.indexLetter
 import com.lordyhas.muzik.data.repository.parseLyrics
 import org.junit.Assert.assertEquals
@@ -57,5 +60,74 @@ class LibraryLogicTest {
         assertEquals("A", indexLetter("  abba"))
         assertEquals("#", indexLetter("2Pac"))
         assertEquals("#", indexLetter(""))
+    }
+
+    private fun song(
+        id: Long,
+        album: String,
+        albumId: Long,
+        artist: String = "Artist",
+        track: Int? = null,
+        disc: Int? = null
+    ) = Song(
+        id = id,
+        title = "Song $id",
+        artist = artist,
+        album = album,
+        albumId = albumId,
+        duration = 180_000L,
+        contentUri = FakeUri("content://media/$id"),
+        trackNumber = track,
+        discNumber = disc
+    )
+
+    @Test
+    fun `albums with the same title but different ids stay separate`() {
+        val albums = listOf(
+            song(1, "Greatest Hits", albumId = 10, artist = "Queen"),
+            song(2, "Greatest Hits", albumId = 20, artist = "ABBA"),
+            song(3, "Greatest Hits", albumId = 10, artist = "Queen")
+        ).groupIntoAlbums()
+
+        assertEquals(2, albums.size)
+        // Same title, so ordered by artist
+        assertEquals(listOf("ABBA", "Queen"), albums.map { it.artist })
+        assertEquals(listOf(20L, 10L), albums.map { it.id })
+        assertEquals(listOf(2L), albums[0].songs.map { it.id })
+        assertEquals(listOf(1L, 3L), albums[1].songs.map { it.id })
+    }
+
+    @Test
+    fun `album tracks are ordered by disc then track`() {
+        val album = listOf(
+            song(1, "Double", albumId = 5, track = 2, disc = 2),
+            song(2, "Double", albumId = 5, track = 1, disc = 2),
+            song(3, "Double", albumId = 5, track = 1, disc = 1)
+        ).groupIntoAlbums().single()
+
+        assertEquals(listOf(3L, 2L, 1L), album.songs.map { it.id })
+        assertEquals(3, album.songCount)
+    }
+
+    @Test
+    fun `album artist is the most frequent track artist`() {
+        val album = listOf(
+            song(1, "Record", albumId = 7, artist = "Main feat. Guest"),
+            song(2, "Record", albumId = 7, artist = "Main"),
+            song(3, "Record", albumId = 7, artist = "Main")
+        ).groupIntoAlbums().single()
+
+        assertEquals("Main", album.artist)
+    }
+
+    @Test
+    fun `albums are sorted by title ignoring case`() {
+        val titles = listOf(
+            song(1, "zebra", albumId = 1),
+            song(2, "Apple", albumId = 2),
+            song(3, "mango", albumId = 3)
+        ).groupIntoAlbums().map { it.title }
+
+        assertEquals(listOf("Apple", "mango", "zebra"), titles)
     }
 }
