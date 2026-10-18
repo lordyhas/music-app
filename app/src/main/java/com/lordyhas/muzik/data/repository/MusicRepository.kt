@@ -123,7 +123,8 @@ class MusicRepository(private val context: Context) {
                         trackNumber = trackNumber,
                         discNumber = discNumber,
                         dateAdded = dateAdded,
-                        folderPath = folderPath
+                        folderPath = folderPath,
+                        fileName = displayName
                     )
                     songsList.add(song)
                 }

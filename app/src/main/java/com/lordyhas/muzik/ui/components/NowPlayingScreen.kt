@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -82,6 +83,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import coil.compose.AsyncImage
 import com.lordyhas.muzik.data.model.Song
+import com.lordyhas.muzik.data.repository.LyricsState
 import com.lordyhas.muzik.service.SleepTimer
 import com.lordyhas.muzik.ui.theme.BackgroundDark
 import com.lordyhas.muzik.ui.theme.StrokeSubtle
@@ -121,6 +123,9 @@ fun NowPlayingScreen(
     onAudioEffectsClick: () -> Unit,
     isLiked: Boolean,
     onToggleLike: () -> Unit,
+    showLyrics: Boolean,
+    lyricsState: LyricsState,
+    onToggleLyrics: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -256,8 +261,18 @@ fun NowPlayingScreen(
                         )
                     }
 
-                    // ── Album Art (swipe left/right to skip) ─────────────
-                    SwipeableCover(
+                    // ── Lyrics panel or album art (swipe left/right to skip) ──
+                    if (showLyrics) {
+                        LyricsPanel(
+                            state = lyricsState,
+                            positionMs = currentPosition,
+                            accent = accent,
+                            onSeek = onSeekTo,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                        )
+                    } else SwipeableCover(
                         songKey = song.id,
                         onSwipeNext = onSkipNext,
                         onSwipePrevious = onSkipPrevious
@@ -419,6 +434,13 @@ fun NowPlayingScreen(
                             active = sleepTimer != SleepTimer.Off,
                             accent = accent,
                             onClick = onSleepTimerClick
+                        )
+                        PlayerActionChip(
+                            icon = Icons.Default.Lyrics,
+                            label = "Lyrics",
+                            active = showLyrics,
+                            accent = accent,
+                            onClick = onToggleLyrics
                         )
                         PlayerActionChip(
                             icon = Icons.Default.Tune,

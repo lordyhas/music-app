@@ -19,6 +19,8 @@ import com.lordyhas.muzik.data.model.Playlist
 import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.data.model.sortedForAlbum
 import com.lordyhas.muzik.data.repository.LibraryRepository
+import com.lordyhas.muzik.data.repository.LyricsRepository
+import com.lordyhas.muzik.data.repository.LyricsState
 import com.lordyhas.muzik.data.repository.MusicRepository
 import com.lordyhas.muzik.data.repository.PlaylistRepository
 import com.lordyhas.muzik.service.EqualizerInfo
@@ -27,7 +29,12 @@ import com.lordyhas.muzik.service.MusicController
 import com.lordyhas.muzik.service.PlaybackSettings
 import com.lordyhas.muzik.service.SleepTimer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filterNotNull
@@ -359,6 +366,29 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val duration = musicController.duration
     val isShuffle = musicController.isShuffle
     val repeatMode = musicController.repeatMode
+
+    // ─── Lyrics (loaded only while the lyrics panel is open) ──────────────────
+
+    private val lyricsRepository = LyricsRepository(application)
+    private val _showLyrics = MutableStateFlow(false)
+    val showLyrics: StateFlow<Boolean> = _showLyrics.asStateFlow()
+
+    fun toggleLyrics() { _showLyrics.value = !_showLyrics.value }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val lyrics: StateFlow<LyricsState> = combine(currentSong, _showLyrics) { song, show -> song.takeIf { show } }
+        .distinctUntilChanged { old, new -> old?.id == new?.id }
+        .flatMapLatest { song ->
+            if (song == null) {
+                flowOf<LyricsState>(LyricsState.Hidden)
+            } else {
+                flow<LyricsState> {
+                    emit(LyricsState.Loading)
+                    emit(lyricsRepository.load(song)?.let { LyricsState.Loaded(it) } ?: LyricsState.NotFound)
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LyricsState.Hidden)
 
     fun setPermissionGranted(granted: Boolean) {
         _isPermissionGranted.value = granted
