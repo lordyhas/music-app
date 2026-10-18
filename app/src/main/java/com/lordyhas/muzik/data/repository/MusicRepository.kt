@@ -4,6 +4,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import com.lordyhas.muzik.data.model.Song
@@ -24,7 +25,7 @@ class MusicRepository(private val context: Context) {
 
         // Query Android MediaStore (single source of truth for all audio on the device)
         val uri: Uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val projection = arrayOf(
+        val projection = listOfNotNull(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
@@ -34,8 +35,9 @@ class MusicRepository(private val context: Context) {
             MediaStore.Audio.Media.DISPLAY_NAME,
             MediaStore.Audio.Media.TRACK,
             MediaStore.Audio.Media.DATE_ADDED,
-            @Suppress("DEPRECATION") MediaStore.Audio.Media.DATA
-        )
+            @Suppress("DEPRECATION") MediaStore.Audio.Media.DATA,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaStore.Audio.Media.IS_RECORDING else null
+        ).toTypedArray()
 
         val selection = "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.MIME_TYPE} LIKE 'audio/%' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.mp3' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.m4a' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.wav' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.flac' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.ogg' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.aac' OR ${MediaStore.Audio.Media.DISPLAY_NAME} LIKE '%.opus') AND (${MediaStore.Audio.Media.IS_RINGTONE} == 0 OR ${MediaStore.Audio.Media.IS_RINGTONE} IS NULL) AND (${MediaStore.Audio.Media.IS_NOTIFICATION} == 0 OR ${MediaStore.Audio.Media.IS_NOTIFICATION} IS NULL) AND (${MediaStore.Audio.Media.IS_ALARM} == 0 OR ${MediaStore.Audio.Media.IS_ALARM} IS NULL)"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
@@ -61,6 +63,9 @@ class MusicRepository(private val context: Context) {
                 val dateAddedColumn = it.getColumnIndex(MediaStore.Audio.Media.DATE_ADDED)
                 @Suppress("DEPRECATION")
                 val dataColumn = it.getColumnIndex(MediaStore.Audio.Media.DATA)
+                val recordingColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    it.getColumnIndex(MediaStore.Audio.Media.IS_RECORDING)
+                } else -1
 
                 val albumArtUriBase = Uri.parse("content://media/external/audio/albumart")
 
@@ -76,6 +81,7 @@ class MusicRepository(private val context: Context) {
                     val dateAdded = if (dateAddedColumn != -1 && !it.isNull(dateAddedColumn)) it.getLong(dateAddedColumn) else 0L
                     val filePath = if (dataColumn != -1) it.getString(dataColumn) else null
                     val folderPath = filePath?.substringBeforeLast('/', missingDelimiterValue = "").orEmpty()
+                    val isRecording = recordingColumn != -1 && !it.isNull(recordingColumn) && it.getInt(recordingColumn) != 0
 
                     val cleanTitle = when {
                         !rawTitle.isNullOrBlank() && rawTitle != "<unknown>" -> rawTitle
@@ -125,7 +131,8 @@ class MusicRepository(private val context: Context) {
                         discNumber = discNumber,
                         dateAdded = dateAdded,
                         folderPath = folderPath,
-                        fileName = displayName
+                        fileName = displayName,
+                        isRecording = isRecording
                     )
                     songsList.add(song)
                 }

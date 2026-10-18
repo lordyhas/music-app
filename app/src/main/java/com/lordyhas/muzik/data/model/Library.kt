@@ -62,12 +62,34 @@ data class SmartPlaylist(
     val songs: List<Song>
 )
 
-/** A device folder that directly contains music. */
+/**
+ * A device folder that directly contains music. [hiddenBy] is set only in the folder manager list:
+ * the hidden folder that hides this one (itself, or a parent folder).
+ */
 data class Folder(
     val path: String,
     val name: String,
-    val songs: List<Song>
-)
+    val songs: List<Song>,
+    val hiddenBy: String? = null
+) {
+    val hidden: Boolean get() = hiddenBy != null
+    /** Hidden only because a parent folder is hidden, so it can't be shown on its own. */
+    val hiddenByParent: Boolean get() = hiddenBy != null && hiddenBy != path
+}
+
+/** Groups songs by the folder that contains them, A–Z by folder name. */
+fun List<Song>.groupIntoFolders(hiddenBy: (String) -> String? = { null }): List<Folder> =
+    filter { it.folderPath.isNotBlank() }
+        .groupBy { it.folderPath }
+        .map { (path, folderSongs) ->
+            Folder(
+                path = path,
+                name = path.substringAfterLast('/').ifBlank { path },
+                songs = folderSongs.sortedBy { it.title.lowercase() },
+                hiddenBy = hiddenBy(path)
+            )
+        }
+        .sortedWith(compareBy<Folder> { it.name.lowercase() }.thenBy { it.path.lowercase() })
 
 data class SearchResults(
     val songs: List<Song> = emptyList(),

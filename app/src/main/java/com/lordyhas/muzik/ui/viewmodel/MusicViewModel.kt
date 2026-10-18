@@ -17,7 +17,11 @@ import com.lordyhas.muzik.data.model.SongSort
 import com.lordyhas.muzik.data.model.Artist
 import com.lordyhas.muzik.data.model.Playlist
 import com.lordyhas.muzik.data.model.Song
+import com.lordyhas.muzik.data.model.LibraryFilter
+import com.lordyhas.muzik.data.model.filteredBy
 import com.lordyhas.muzik.data.model.groupIntoAlbums
+import com.lordyhas.muzik.data.model.groupIntoFolders
+import com.lordyhas.muzik.data.repository.LibraryFilterStore
 import com.lordyhas.muzik.data.repository.LibraryRepository
 import com.lordyhas.muzik.data.repository.LyricsRepository
 import com.lordyhas.muzik.data.repository.LyricsState
@@ -58,6 +62,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         PlaybackSettings.init(application)
+        LibraryFilterStore.init(application)
     }
 
     // Sleep timer / speed / equalizer live in the playback service; the UI only reads & requests changes
@@ -66,8 +71,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val equalizer: StateFlow<EqualizerSettings> = PlaybackSettings.equalizer
     val equalizerInfo: StateFlow<EqualizerInfo?> = PlaybackSettings.equalizerInfo
 
+    /** Everything MediaStore returned; [_songs] is this minus what [libraryFilter] excludes. */
+    private val _allSongs = MutableStateFlow<List<Song>>(emptyList())
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
+
+    val libraryFilter: StateFlow<LibraryFilter> = LibraryFilterStore.filter
+
+    init {
+        viewModelScope.launch {
+            LibraryFilterStore.filter.collect { filter -> _songs.value = _allSongs.value.filteredBy(filter) }
+        }
+    }
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -226,17 +241,22 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Folders that directly contain music, A–Z. */
     val folders: StateFlow<List<Folder>> = _songs.map { songList ->
-        songList.filter { it.folderPath.isNotBlank() }
-            .groupBy { it.folderPath }
-            .map { (path, folderSongs) ->
-                Folder(
-                    path = path,
-                    name = path.substringAfterLast('/').ifBlank { path },
-                    songs = folderSongs.sortedBy { it.title.lowercase() }
-                )
-            }
-            .sortedBy { it.name.lowercase() }
+        songList.groupIntoFolders()
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /** Every folder, hidden ones included (flagged), for the folder manager. */
+    val allFolders: StateFlow<List<Folder>> = combine(_allSongs, LibraryFilterStore.filter) { all, filter ->
+        // Count what would show if the folder were visible (short clips/recordings stay excluded)
+        all.filteredBy(filter.copy(hiddenFolders = emptySet())).groupIntoFolders(filter::hidingFolderOf)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /** How many device audio files the library filter currently keeps out. */
+    val hiddenSongCount: StateFlow<Int> = combine(_allSongs, _songs) { all, visible -> all.size - visible.size }
+        .stateIn(viewModelScope, SharingStarted.Lazily, 0)
+
+    fun setFolderHidden(path: String, hidden: Boolean) = LibraryFilterStore.setFolderHidden(path, hidden)
+    fun setHideRecordings(hide: Boolean) = LibraryFilterStore.setHideRecordings(hide)
+    fun setMinDuration(ms: Long) = LibraryFilterStore.setMinDuration(ms)
 
     // ─── Global search ────────────────────────────────────────────────────────
 
@@ -393,7 +413,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isLoading.value = true
             val loaded = repository.getLocalSongs()
-            _songs.value = loaded
+            _allSongs.value = loaded
+            _songs.value = loaded.filteredBy(LibraryFilterStore.filter.value)
             _isLoading.value = false
         }
     }

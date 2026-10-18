@@ -85,7 +85,7 @@ fun formatCountdown(ms: Long): String {
 }
 
 @Composable
-private fun SheetDragHandle() {
+internal fun SheetDragHandle() {
     Box(
         modifier = Modifier
             .padding(vertical = 12.dp)
@@ -365,7 +365,7 @@ fun AudioEffectsSheet(
 }
 
 @Composable
-private fun chipColors() = FilterChipDefaults.filterChipColors(
+internal fun chipColors() = FilterChipDefaults.filterChipColors(
     containerColor = SurfaceCard,
     labelColor = TextPrimary,
     selectedContainerColor = AccentPrimary,

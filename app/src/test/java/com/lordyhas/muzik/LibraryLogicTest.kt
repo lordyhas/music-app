@@ -1,7 +1,9 @@
 package com.lordyhas.muzik
 
 import android.net.FakeUri
+import com.lordyhas.muzik.data.model.LibraryFilter
 import com.lordyhas.muzik.data.model.Song
+import com.lordyhas.muzik.data.model.filteredBy
 import com.lordyhas.muzik.data.model.groupIntoAlbums
 import com.lordyhas.muzik.data.model.indexLetter
 import com.lordyhas.muzik.data.repository.parseLyrics
@@ -68,17 +70,22 @@ class LibraryLogicTest {
         albumId: Long,
         artist: String = "Artist",
         track: Int? = null,
-        disc: Int? = null
+        disc: Int? = null,
+        folder: String = "/storage/emulated/0/Music",
+        duration: Long = 180_000L,
+        isRecording: Boolean = false
     ) = Song(
         id = id,
         title = "Song $id",
         artist = artist,
         album = album,
         albumId = albumId,
-        duration = 180_000L,
+        duration = duration,
         contentUri = FakeUri("content://media/$id"),
         trackNumber = track,
-        discNumber = disc
+        discNumber = disc,
+        folderPath = folder,
+        isRecording = isRecording
     )
 
     @Test
@@ -129,5 +136,33 @@ class LibraryLogicTest {
         ).groupIntoAlbums().map { it.title }
 
         assertEquals(listOf("Apple", "mango", "zebra"), titles)
+    }
+
+    @Test
+    fun `hidden folder hides its songs and its subfolders but not look-alike names`() {
+        val filter = LibraryFilter(hiddenFolders = setOf("/sdcard/Recordings"))
+        val kept = listOf(
+            song(1, "A", albumId = 1, folder = "/sdcard/Recordings"),
+            song(2, "A", albumId = 1, folder = "/sdcard/Recordings/Calls"),
+            song(3, "A", albumId = 1, folder = "/sdcard/Recordings Old"),
+            song(4, "A", albumId = 1, folder = "/sdcard/Music")
+        ).filteredBy(filter)
+
+        assertEquals(listOf(3L, 4L), kept.map { it.id })
+    }
+
+    @Test
+    fun `short clips and recordings are filtered but unknown durations are kept`() {
+        val filter = LibraryFilter(hideRecordings = true, minDurationMs = 30_000L)
+        val kept = listOf(
+            song(1, "A", albumId = 1, duration = 5_000L),
+            song(2, "A", albumId = 1, duration = 0L),
+            song(3, "A", albumId = 1, isRecording = true),
+            song(4, "A", albumId = 1)
+        ).filteredBy(filter)
+
+        assertEquals(listOf(2L, 4L), kept.map { it.id })
+        val recording = song(5, "A", albumId = 1, isRecording = true)
+        assertEquals(listOf(5L), listOf(recording).filteredBy(LibraryFilter(hideRecordings = false)).map { it.id })
     }
 }
