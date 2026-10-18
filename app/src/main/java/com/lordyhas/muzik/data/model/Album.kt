@@ -11,6 +11,26 @@ data class Album(
     val songs: List<Song> = emptyList()
 )
 
+/**
+ * Groups songs into albums by MediaStore album id rather than by title, so two different albums
+ * that share a name (e.g. two artists' "Greatest Hits") stay separate.
+ */
+fun List<Song>.groupIntoAlbums(): List<Album> =
+    groupBy { it.albumId }
+        .map { (albumId, albumSongs) ->
+            val sorted = albumSongs.sortedForAlbum()
+            Album(
+                id = albumId,
+                title = sorted.first().album,
+                // Most frequent track artist, so a single "feat." track doesn't name the album.
+                artist = albumSongs.groupingBy { it.artist }.eachCount().maxByOrNull { it.value }!!.key,
+                albumArtUri = sorted.firstOrNull { it.albumArtUri != null }?.albumArtUri,
+                songCount = sorted.size,
+                songs = sorted
+            )
+        }
+        .sortedWith(compareBy<Album> { it.title.lowercase() }.thenBy { it.artist.lowercase() })
+
 fun List<Song>.sortedForAlbum(): List<Song> {
     return sortedWith(
         compareBy<Song> { it.discNumber ?: 1 }

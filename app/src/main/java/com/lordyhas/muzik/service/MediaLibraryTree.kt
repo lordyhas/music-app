@@ -5,8 +5,9 @@ import android.os.SystemClock
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaSession.MediaItemsWithStartPosition
+import com.lordyhas.muzik.data.model.Album
 import com.lordyhas.muzik.data.model.Song
-import com.lordyhas.muzik.data.model.sortedForAlbum
+import com.lordyhas.muzik.data.model.groupIntoAlbums
 import com.lordyhas.muzik.data.repository.LibraryRepository
 import com.lordyhas.muzik.data.repository.MusicRepository
 import com.lordyhas.muzik.data.repository.PlaylistRepository
@@ -36,7 +37,7 @@ class MediaLibraryTree(private val context: Context) {
     private data class Snapshot(
         val songs: List<Song>,
         val songsById: Map<Long, Song>,
-        val albums: Map<String, List<Song>>,
+        val albums: List<Album>,
         val artists: Map<String, List<Song>>,
         val playlists: List<Pair<String, String>>, // id to name
         val playlistSongs: Map<String, List<Long>>,
@@ -55,7 +56,7 @@ class MediaLibraryTree(private val context: Context) {
         val snapshot = Snapshot(
             songs = songs,
             songsById = songs.associateBy { it.id },
-            albums = songs.groupBy { it.album }.mapValues { it.value.sortedForAlbum() }.toSortedMap(String.CASE_INSENSITIVE_ORDER),
+            albums = songs.groupIntoAlbums(),
             artists = songs.groupBy { it.artist }.toSortedMap(String.CASE_INSENSITIVE_ORDER),
             playlists = playlistRepository.getAllPlaylists().first().map { it.id to it.name },
             playlistSongs = playlistRows.groupBy { it.playlistId }.mapValues { (_, rows) -> rows.map { it.songId } },
@@ -87,9 +88,9 @@ class MediaLibraryTree(private val context: Context) {
             parentId == PLAYLISTS -> s.playlists.map { (id, name) ->
                 folder("$PLAYLIST_PREFIX$id", name, MediaMetadata.MEDIA_TYPE_PLAYLIST)
             }
-            parentId == ALBUMS -> s.albums.map { (title, songs) ->
-                folder("$ALBUM_PREFIX$title", title, MediaMetadata.MEDIA_TYPE_ALBUM, subtitle = songs.first().artist,
-                    artwork = songs.firstOrNull { it.albumArtUri != null }?.albumArtUri)
+            parentId == ALBUMS -> s.albums.map { album ->
+                folder("$ALBUM_PREFIX${album.id}", album.title, MediaMetadata.MEDIA_TYPE_ALBUM, subtitle = album.artist,
+                    artwork = album.albumArtUri)
             }
             parentId == ARTISTS -> s.artists.map { (name, _) ->
                 folder("$ARTIST_PREFIX$name", name, MediaMetadata.MEDIA_TYPE_ARTIST)
@@ -161,7 +162,10 @@ class MediaLibraryTree(private val context: Context) {
         parentId == SONGS -> s.songs
         parentId.startsWith(PLAYLIST_PREFIX) ->
             s.playlistSongs[parentId.removePrefix(PLAYLIST_PREFIX)].orEmpty().mapNotNull { s.songsById[it] }
-        parentId.startsWith(ALBUM_PREFIX) -> s.albums[parentId.removePrefix(ALBUM_PREFIX)].orEmpty()
+        parentId.startsWith(ALBUM_PREFIX) -> {
+            val albumId = parentId.removePrefix(ALBUM_PREFIX).toLongOrNull()
+            s.albums.firstOrNull { it.id == albumId }?.songs.orEmpty()
+        }
         parentId.startsWith(ARTIST_PREFIX) -> s.artists[parentId.removePrefix(ARTIST_PREFIX)].orEmpty()
         else -> emptyList()
     }

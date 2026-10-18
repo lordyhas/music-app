@@ -37,7 +37,7 @@ fun PlaylistDetailScreen(
     viewModel: MusicViewModel,
     onBackClick: () -> Unit,
     onGoToArtist: (String) -> Unit,
-    onGoToAlbum: (String) -> Unit,
+    onGoToAlbum: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     BackHandler(enabled = true) {
@@ -74,10 +74,7 @@ fun PlaylistDetailScreen(
                 placeholderIcon = Icons.Default.PlaylistPlay,
                 cover = { coverModifier -> PlaylistCollage(playlist = playlist, modifier = coverModifier) },
                 onPlay = if (hasSongs) ({ viewModel.playPlaylist(playlist) }) else null,
-                onShuffle = if (hasSongs) ({
-                    val shuffled = songs.shuffled()
-                    viewModel.playSong(shuffled.first(), shuffled)
-                }) else null
+                onShuffle = if (hasSongs) ({ viewModel.playPlaylist(playlist, shuffle = true) }) else null
             )
         }
 
@@ -112,7 +109,7 @@ fun PlaylistDetailScreen(
                     onToggleLike = { viewModel.toggleLike(song) },
                     onRemoveFromPlaylist = { viewModel.removeSongFromPlaylist(playlist.id, song.id) },
                     onGoToArtist = { onGoToArtist(song.artist) },
-                    onGoToAlbum = { onGoToAlbum(song.album) },
+                    onGoToAlbum = { onGoToAlbum(song.albumId) },
                     onShowDetails = { viewModel.selectSongForDetails(song) },
                     trailing = { DragHandleIcon(modifier = handle) },
                     modifier = if (dragging) {

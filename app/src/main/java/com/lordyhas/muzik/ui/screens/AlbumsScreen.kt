@@ -44,13 +44,15 @@ import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
 @Composable
 fun AlbumsScreen(
     viewModel: MusicViewModel,
-    onAlbumClick: (String) -> Unit,
+    onAlbumClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val albums by viewModel.sortedAlbums.collectAsState()
     val albumSort by viewModel.albumSort.collectAsState()
     val gridState = rememberLazyGridState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val currentSong by viewModel.currentSong.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
 
@@ -111,7 +113,9 @@ fun AlbumsScreen(
                 items(filteredAlbums, key = { it.title + it.id }) { album ->
                     AlbumCard(
                         album = album,
-                        onClick = { onAlbumClick(album.title) }
+                        isCurrent = currentSong?.albumId == album.id,
+                        isPlaying = isPlaying,
+                        onClick = { onAlbumClick(album.id) }
                     )
                 }
             }

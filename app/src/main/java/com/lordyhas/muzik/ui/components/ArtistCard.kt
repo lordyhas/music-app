@@ -2,6 +2,7 @@ package com.lordyhas.muzik.ui.components
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lordyhas.muzik.data.model.Artist
+import com.lordyhas.muzik.ui.theme.AccentPrimary
 import com.lordyhas.muzik.ui.theme.AccentSecondary
 import com.lordyhas.muzik.ui.theme.StrokeSubtle
 import com.lordyhas.muzik.ui.theme.TextPrimary
@@ -31,7 +33,9 @@ import com.lordyhas.muzik.ui.theme.TextSecondary
 fun ArtistCard(
     artist: Artist,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isCurrent: Boolean = false,
+    isPlaying: Boolean = false
 ) {
     Column(
         modifier = modifier
@@ -41,24 +45,33 @@ fun ArtistCard(
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Artwork(
-            uri = artist.artworkUri,
-            shape = CircleShape,
-            placeholderIcon = Icons.Default.Person,
-            iconSize = 36.dp,
-            placeholderTint = AccentSecondary,
-            contentDescription = artist.name,
-            modifier = Modifier
-                .size(92.dp)
-                .border(1.dp, StrokeSubtle, CircleShape)
-        )
+        Box {
+            Artwork(
+                uri = artist.artworkUri,
+                shape = CircleShape,
+                placeholderIcon = Icons.Default.Person,
+                iconSize = 36.dp,
+                placeholderTint = AccentSecondary,
+                contentDescription = artist.name,
+                modifier = Modifier
+                    .size(92.dp)
+                    .border(1.dp, if (isCurrent) AccentPrimary else StrokeSubtle, CircleShape)
+            )
+            if (isCurrent) {
+                NowPlayingBadge(
+                    isPlaying = isPlaying,
+                    size = 26.dp,
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = artist.name,
             style = MaterialTheme.typography.titleSmall,
-            color = TextPrimary,
+            color = if (isCurrent) AccentPrimary else TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center

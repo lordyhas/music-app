@@ -45,7 +45,7 @@ import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
 @OptIn(UnstableApi::class)
 @Composable
 fun AlbumDetailScreen(
-    albumTitle: String,
+    albumId: Long,
     viewModel: MusicViewModel,
     onBackClick: () -> Unit,
     onGoToArtist: (String) -> Unit,
@@ -56,8 +56,7 @@ fun AlbumDetailScreen(
     }
 
     val albums by viewModel.albums.collectAsState()
-    val album: Album? = albums.find { it.title.equals(albumTitle, ignoreCase = true) }
-        ?: albums.find { it.title.contains(albumTitle, ignoreCase = true) }
+    val album: Album? = albums.find { it.id == albumId }
 
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()

@@ -47,11 +47,13 @@ import com.lordyhas.muzik.data.model.indexLetter
 import com.lordyhas.muzik.ui.components.AlphabetFastScroller
 import com.lordyhas.muzik.ui.components.SortMenuButton
 import com.lordyhas.muzik.ui.components.Artwork
+import com.lordyhas.muzik.ui.components.NowPlayingBadge
 import com.lordyhas.muzik.ui.components.EmptyState
 import com.lordyhas.muzik.ui.components.LoadingState
 import com.lordyhas.muzik.ui.components.MuzikSearchField
 import com.lordyhas.muzik.ui.components.ScreenHeader
 import com.lordyhas.muzik.ui.components.pluralize
+import com.lordyhas.muzik.ui.theme.AccentPrimary
 import com.lordyhas.muzik.ui.theme.AccentSecondary
 import com.lordyhas.muzik.ui.theme.BackgroundDark
 import com.lordyhas.muzik.ui.theme.StrokeSubtle
@@ -71,6 +73,8 @@ fun ArtistsScreen(
     val artistSort by viewModel.artistSort.collectAsState()
     val listState = rememberLazyListState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val currentSong by viewModel.currentSong.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
 
@@ -129,6 +133,8 @@ fun ArtistsScreen(
                 items(filteredArtists, key = { it.name }) { artist ->
                     ArtistListItem(
                         artist = artist,
+                        isCurrent = currentSong?.artist == artist.name,
+                        isPlaying = isPlaying,
                         onClick = { onArtistClick(artist.name) }
                     )
                 }
@@ -148,6 +154,8 @@ fun ArtistsScreen(
 @Composable
 private fun ArtistListItem(
     artist: Artist,
+    isCurrent: Boolean,
+    isPlaying: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -159,17 +167,26 @@ private fun ArtistListItem(
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Artwork(
-            uri = artist.artworkUri,
-            shape = CircleShape,
-            placeholderIcon = Icons.Default.Person,
-            iconSize = 28.dp,
-            placeholderTint = AccentSecondary,
-            contentDescription = artist.name,
-            modifier = Modifier
-                .size(56.dp)
-                .border(1.dp, StrokeSubtle, CircleShape)
-        )
+        Box {
+            Artwork(
+                uri = artist.artworkUri,
+                shape = CircleShape,
+                placeholderIcon = Icons.Default.Person,
+                iconSize = 28.dp,
+                placeholderTint = AccentSecondary,
+                contentDescription = artist.name,
+                modifier = Modifier
+                    .size(56.dp)
+                    .border(1.dp, if (isCurrent) AccentPrimary else StrokeSubtle, CircleShape)
+            )
+            if (isCurrent) {
+                NowPlayingBadge(
+                    isPlaying = isPlaying,
+                    size = 22.dp,
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.width(14.dp))
 
@@ -177,7 +194,7 @@ private fun ArtistListItem(
             Text(
                 text = artist.name,
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
-                color = TextPrimary,
+                color = if (isCurrent) AccentPrimary else TextPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
