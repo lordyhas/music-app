@@ -29,7 +29,8 @@ It provides a seamless, fast, and elegant offline listening experience with zero
   - **Songs**: every local song with real-time search, sorting (title, artist, album, recently added, duration) and an A–Z fast scroller.
   - **Albums**: browse by album with cover artwork, disc numbers and track numbers.
   - **Artists**: explore your library by artist, with their albums and songs.
-  - **Folders**: browse music by device folder.
+  - **Folders**: browse music by device folder, and hide folders you don't want (voice notes, recordings, ringtones...) so their audio never shows up anywhere, Android Auto included.
+  - **Library filters**: hide voice recordings (Android 12+) and skip short clips like alarms and notification sounds.
   - **Search**: one search across songs, artists, albums and playlists.
   - **Custom Playlists**: create, rename, reorder and delete playlists backed by **Room**.
   - **Smart Playlists**: *Liked Songs*, *Most Played*, *Recently Added* and *Rediscover*, built automatically from your likes and listening history.

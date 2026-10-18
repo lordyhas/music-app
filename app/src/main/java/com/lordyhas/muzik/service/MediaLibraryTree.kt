@@ -7,7 +7,9 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaSession.MediaItemsWithStartPosition
 import com.lordyhas.muzik.data.model.Album
 import com.lordyhas.muzik.data.model.Song
+import com.lordyhas.muzik.data.model.filteredBy
 import com.lordyhas.muzik.data.model.groupIntoAlbums
+import com.lordyhas.muzik.data.repository.LibraryFilterStore
 import com.lordyhas.muzik.data.repository.LibraryRepository
 import com.lordyhas.muzik.data.repository.MusicRepository
 import com.lordyhas.muzik.data.repository.PlaylistRepository
@@ -51,7 +53,7 @@ class MediaLibraryTree(private val context: Context) {
 
     private suspend fun snapshot(): Snapshot {
         cached?.takeIf { SystemClock.elapsedRealtime() - it.loadedAt < CACHE_MS }?.let { return it }
-        val songs = musicRepository.getLocalSongs(scanStorage = false)
+        val songs = musicRepository.getLocalSongs(scanStorage = false).filteredBy(LibraryFilterStore.filter.value)
         val playlistRows = playlistRepository.getAllPlaylistSongs().first()
         val snapshot = Snapshot(
             songs = songs,

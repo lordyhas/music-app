@@ -330,7 +330,8 @@ fun EmptyState(
     icon: ImageVector,
     title: String,
     modifier: Modifier = Modifier,
-    message: String? = null
+    message: String? = null,
+    action: (@Composable () -> Unit)? = null
 ) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
@@ -365,6 +366,10 @@ fun EmptyState(
                     color = TextSecondary,
                     textAlign = TextAlign.Center
                 )
+            }
+            if (action != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                action()
             }
         }
     }

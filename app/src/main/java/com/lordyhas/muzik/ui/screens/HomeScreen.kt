@@ -35,6 +35,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -95,6 +98,7 @@ fun HomeScreen(
     val recentAlbums by viewModel.recentlyPlayedAlbums.collectAsState()
     val recentArtists by viewModel.recentlyPlayedArtists.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val hiddenSongCount by viewModel.hiddenSongCount.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
 
@@ -157,6 +161,19 @@ fun HomeScreen(
 
             when {
                 isLoading -> LoadingState(modifier = Modifier.height(240.dp))
+                // Everything filtered out: say so, and offer the way back
+                songs.isEmpty() && hiddenSongCount > 0 -> EmptyState(
+                    icon = Icons.Default.VisibilityOff,
+                    title = "All your music is hidden",
+                    message = "${pluralize(hiddenSongCount, "audio file")} hidden by your folder and library filters.",
+                    modifier = Modifier.height(360.dp),
+                    action = {
+                        Button(
+                            onClick = onFoldersClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary)
+                        ) { Text("Manage folders") }
+                    }
+                )
                 songs.isEmpty() -> EmptyState(
                     icon = Icons.Default.LibraryMusic,
                     title = "No music found on this device",

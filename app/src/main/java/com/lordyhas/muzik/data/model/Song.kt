@@ -22,7 +22,9 @@ data class Song(
     /** Directory containing the file, e.g. "/storage/emulated/0/Music/Rock". */
     val folderPath: String = "",
     /** File name with extension, e.g. "01 - Intro.mp3". */
-    val fileName: String = ""
+    val fileName: String = "",
+    /** Voice/call recording according to MediaStore (Android 12+ only, always false before). */
+    val isRecording: Boolean = false
 ) {
     fun formattedDuration(): String {
         val minutes = TimeUnit.MILLISECONDS.toMinutes(duration)
