@@ -7,14 +7,39 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
 import com.lordyhas.muzik.data.local.PlaylistEntity
 import com.lordyhas.muzik.data.model.Album
+import com.lordyhas.muzik.data.model.AlbumSort
+import com.lordyhas.muzik.data.model.ArtistSort
+import com.lordyhas.muzik.data.model.Folder
+import com.lordyhas.muzik.data.model.SearchResults
+import com.lordyhas.muzik.data.model.SmartPlaylist
+import com.lordyhas.muzik.data.model.SmartPlaylistType
+import com.lordyhas.muzik.data.model.SongSort
 import com.lordyhas.muzik.data.model.Artist
 import com.lordyhas.muzik.data.model.Playlist
 import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.data.model.sortedForAlbum
+import com.lordyhas.muzik.data.repository.LibraryRepository
+import com.lordyhas.muzik.data.repository.LyricsRepository
+import com.lordyhas.muzik.data.repository.LyricsState
 import com.lordyhas.muzik.data.repository.MusicRepository
 import com.lordyhas.muzik.data.repository.PlaylistRepository
+import com.lordyhas.muzik.service.EqualizerInfo
+import com.lordyhas.muzik.service.EqualizerSettings
 import com.lordyhas.muzik.service.MusicController
+import com.lordyhas.muzik.service.PlaybackSettings
+import com.lordyhas.muzik.service.SleepTimer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +55,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = MusicRepository(application)
     private val playlistRepository = PlaylistRepository(application)
     val musicController = MusicController(application)
+
+    init {
+        PlaybackSettings.init(application)
+    }
+
+    // Sleep timer / speed / equalizer live in the playback service; the UI only reads & requests changes
+    val sleepTimer: StateFlow<SleepTimer> = PlaybackSettings.sleepTimer
+    val playbackSpeed: StateFlow<Float> = PlaybackSettings.speed
+    val equalizer: StateFlow<EqualizerSettings> = PlaybackSettings.equalizer
+    val equalizerInfo: StateFlow<EqualizerInfo?> = PlaybackSettings.equalizerInfo
 
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
@@ -58,7 +93,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val userQueue: StateFlow<List<Song>> = musicController.userQueueList
     val contextQueue: StateFlow<List<Song>> = musicController.contextQueueList
 
-    private val _recentSongIds = MutableStateFlow<List<Long>>(loadRecentSongIds())
+    private val libraryRepository = LibraryRepository(application)
+
+    // Listening history is recorded by the playback service into Room
+    private val playStats = libraryRepository.getPlayStats()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val likedEntities = libraryRepository.getLikedSongs()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val likedSongIds: StateFlow<Set<Long>> = likedEntities
+        .map { list -> list.map { it.songId }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     // Detail sheets
     private val _selectedAlbum = MutableStateFlow<Album?>(null)
@@ -117,8 +163,30 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     // ─────────────────────────────────────────────────────────────────────────
 
-    val filteredSongs: StateFlow<List<Song>> = combine(_songs, _searchQuery) { songList, query ->
-        if (query.isBlank()) {
+    // ─── Sorting (persisted) ──────────────────────────────────────────────────
+
+    private val _songSort = MutableStateFlow(loadEnum("song_sort", SongSort.TITLE))
+    val songSort: StateFlow<SongSort> = _songSort.asStateFlow()
+
+    private val _albumSort = MutableStateFlow(loadEnum("album_sort", AlbumSort.TITLE))
+    val albumSort: StateFlow<AlbumSort> = _albumSort.asStateFlow()
+
+    private val _artistSort = MutableStateFlow(loadEnum("artist_sort", ArtistSort.NAME))
+    val artistSort: StateFlow<ArtistSort> = _artistSort.asStateFlow()
+
+    fun setSongSort(sort: SongSort) { _songSort.value = sort; saveEnum("song_sort", sort) }
+    fun setAlbumSort(sort: AlbumSort) { _albumSort.value = sort; saveEnum("album_sort", sort) }
+    fun setArtistSort(sort: ArtistSort) { _artistSort.value = sort; saveEnum("artist_sort", sort) }
+
+    private inline fun <reified T : Enum<T>> loadEnum(key: String, default: T): T =
+        prefs.getString(key, null)?.let { name -> enumValues<T>().firstOrNull { it.name == name } } ?: default
+
+    private fun saveEnum(key: String, value: Enum<*>) {
+        prefs.edit().putString(key, value.name).apply()
+    }
+
+    val filteredSongs: StateFlow<List<Song>> = combine(_songs, _searchQuery, _songSort) { songList, query, sort ->
+        val matching = if (query.isBlank()) {
             songList
         } else {
             val lowerQuery = query.trim().lowercase()
@@ -128,7 +196,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 it.album.lowercase().contains(lowerQuery)
             }
         }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        sort.apply(matching)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val albums: StateFlow<List<Album>> = _songs.map { songList ->
         songList.groupBy { it.album }
@@ -162,10 +231,104 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             .sortedBy { it.name.lowercase() }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    val recentlyPlayedSongs: StateFlow<List<Song>> = combine(_songs, _recentSongIds) { songList, recentIds ->
+    val sortedAlbums: StateFlow<List<Album>> = combine(albums, _albumSort) { list, sort -> sort.apply(list) }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val sortedArtists: StateFlow<List<Artist>> = combine(artists, _artistSort) { list, sort -> sort.apply(list) }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /** Folders that directly contain music, A–Z. */
+    val folders: StateFlow<List<Folder>> = _songs.map { songList ->
+        songList.filter { it.folderPath.isNotBlank() }
+            .groupBy { it.folderPath }
+            .map { (path, folderSongs) ->
+                Folder(
+                    path = path,
+                    name = path.substringAfterLast('/').ifBlank { path },
+                    songs = folderSongs.sortedBy { it.title.lowercase() }
+                )
+            }
+            .sortedBy { it.name.lowercase() }
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // ─── Global search ────────────────────────────────────────────────────────
+
+    private val _globalQuery = MutableStateFlow("")
+    val globalQuery: StateFlow<String> = _globalQuery.asStateFlow()
+
+    fun updateGlobalQuery(query: String) { _globalQuery.value = query }
+
+    @OptIn(FlowPreview::class)
+    val searchResults: StateFlow<SearchResults> = combine(
+        _globalQuery.debounce(150),
+        _songs,
+        albums,
+        artists,
+        playlists
+    ) { query, songList, albumList, artistList, playlistList ->
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) {
+            SearchResults()
+        } else {
+            SearchResults(
+                songs = songList.filter {
+                    it.title.lowercase().contains(q) || it.artist.lowercase().contains(q) || it.album.lowercase().contains(q)
+                },
+                albums = albumList.filter { it.title.lowercase().contains(q) || it.artist.lowercase().contains(q) },
+                artists = artistList.filter { it.name.lowercase().contains(q) },
+                playlists = playlistList.filter { it.name.lowercase().contains(q) }
+            )
+        }
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, SearchResults())
+
+    val recentlyPlayedSongs: StateFlow<List<Song>> = combine(_songs, playStats) { songList, stats ->
         val songMap = songList.associateBy { it.id }
-        recentIds.mapNotNull { songMap[it] }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        stats.filter { it.lastPlayedAt > 0 }
+            .sortedByDescending { it.lastPlayedAt }
+            .mapNotNull { songMap[it.songId] }
+            .take(30)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /** Liked Songs, Most Played, Recently Added and Rediscover, derived live from Room + MediaStore. */
+    val smartPlaylists: StateFlow<List<SmartPlaylist>> = combine(_songs, playStats, likedEntities) { songList, stats, liked ->
+        val songMap = songList.associateBy { it.id }
+        val monthAgo = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+        listOf(
+            SmartPlaylist(SmartPlaylistType.LIKED, liked.mapNotNull { songMap[it.songId] }),
+            SmartPlaylist(
+                SmartPlaylistType.MOST_PLAYED,
+                stats.filter { it.playCount > 0 }.sortedByDescending { it.playCount }.mapNotNull { songMap[it.songId] }.take(50)
+            ),
+            SmartPlaylist(
+                SmartPlaylistType.RECENTLY_ADDED,
+                songList.filter { it.dateAdded > 0 }.sortedByDescending { it.dateAdded }.take(50)
+            ),
+            SmartPlaylist(
+                SmartPlaylistType.REDISCOVER,
+                stats.filter { it.playCount > 0 && it.lastPlayedAt in 1 until monthAgo }
+                    .sortedByDescending { it.playCount }
+                    .mapNotNull { songMap[it.songId] }
+                    .take(50)
+            )
+        )
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    fun toggleLike(song: Song) {
+        val liked = song.id in likedSongIds.value
+        viewModelScope.launch { libraryRepository.setLiked(song.id, !liked) }
+    }
+
+    init {
+        importLegacyRecentHistory()
+
+        // Once both the library and the player connection are ready, restore the last session
+        viewModelScope.launch {
+            combine(_songs, musicController.isControllerReady) { songs, ready -> songs.takeIf { ready } }
+                .filterNotNull()
+                .first { it.isNotEmpty() }
+                .let { musicController.restoreOrSync(it) }
+        }
+    }
 
     val recentlyPlayedAlbums: StateFlow<List<Album>> = combine(albums, recentlyPlayedSongs) { allAlbums, recentSongs ->
         val recentAlbumNames = recentSongs.map { it.album }.distinct()
@@ -204,6 +367,29 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val isShuffle = musicController.isShuffle
     val repeatMode = musicController.repeatMode
 
+    // ─── Lyrics (loaded only while the lyrics panel is open) ──────────────────
+
+    private val lyricsRepository = LyricsRepository(application)
+    private val _showLyrics = MutableStateFlow(false)
+    val showLyrics: StateFlow<Boolean> = _showLyrics.asStateFlow()
+
+    fun toggleLyrics() { _showLyrics.value = !_showLyrics.value }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val lyrics: StateFlow<LyricsState> = combine(currentSong, _showLyrics) { song, show -> song.takeIf { show } }
+        .distinctUntilChanged { old, new -> old?.id == new?.id }
+        .flatMapLatest { song ->
+            if (song == null) {
+                flowOf<LyricsState>(LyricsState.Hidden)
+            } else {
+                flow<LyricsState> {
+                    emit(LyricsState.Loading)
+                    emit(lyricsRepository.load(song)?.let { LyricsState.Loaded(it) } ?: LyricsState.NotFound)
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LyricsState.Hidden)
+
     fun setPermissionGranted(granted: Boolean) {
         _isPermissionGranted.value = granted
         if (granted) loadSongs()
@@ -230,7 +416,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             musicController.playSongList(listOf(song), 0)
         }
-        addToRecentHistory(song.id)
     }
 
     fun playAlbum(album: Album, startSong: Song? = null) {
@@ -260,7 +445,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         if (all.isNotEmpty()) {
             val shuffled = all.shuffled()
             musicController.playSongList(shuffled, 0)
-            addToRecentHistory(shuffled.first().id)
         }
     }
 
@@ -285,6 +469,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun addToQueue(song: Song) { musicController.addToQueue(song) }
     fun removeQueueItem(index: Int) { musicController.removeQueueItem(index) }
     fun playQueueIndex(index: Int) { musicController.playQueueIndex(index) }
+    fun moveQueueItem(from: Int, to: Int) { musicController.moveQueueItem(from, to) }
+
+    fun setSleepTimer(minutes: Int) = PlaybackSettings.setSleepTimer(minutes)
+    fun setSleepAtEndOfTrack() = PlaybackSettings.setSleepAtEndOfTrack()
+    fun cancelSleepTimer() = PlaybackSettings.cancelSleepTimer()
+    fun setPlaybackSpeed(speed: Float) = PlaybackSettings.setSpeed(speed)
+    fun setEqualizerEnabled(enabled: Boolean) = PlaybackSettings.setEqualizerEnabled(enabled)
+    fun selectEqualizerPreset(preset: Int) = PlaybackSettings.selectEqualizerPreset(preset)
+    fun setEqualizerBandLevel(band: Int, level: Int) = PlaybackSettings.setEqualizerBandLevel(band, level)
+    fun resetEqualizer() = PlaybackSettings.resetEqualizer()
 
     fun navigateToArtist(artistName: String) {
         val target = artists.value.firstOrNull { it.name.equals(artistName, ignoreCase = true) }
@@ -360,24 +554,26 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistRepository.removeSongFromPlaylist(playlistId, songId) }
     }
 
+    /** Moves [fromSongId] to where [toSongId] currently sits in the playlist. */
+    fun moveSongInPlaylist(playlist: Playlist, fromSongId: Long, toSongId: Long) {
+        val ids = playlist.songIds.toMutableList()
+        val from = ids.indexOf(fromSongId)
+        val to = ids.indexOf(toSongId)
+        if (from < 0 || to < 0 || from == to) return
+        ids.add(to, ids.removeAt(from))
+        viewModelScope.launch { playlistRepository.reorder(playlist.id, ids) }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
 
-    private fun addToRecentHistory(songId: Long) {
-        val current = _recentSongIds.value.toMutableList()
-        current.remove(songId)
-        current.add(0, songId)
-        val trimmed = current.take(30)
-        _recentSongIds.value = trimmed
-        saveRecentSongIds(trimmed)
-    }
-
-    private fun loadRecentSongIds(): List<Long> {
-        val raw = prefs.getString("recent_song_ids", null) ?: return emptyList()
-        return raw.split(",").mapNotNull { it.trim().toLongOrNull() }
-    }
-
-    private fun saveRecentSongIds(ids: List<Long>) {
-        prefs.edit().putString("recent_song_ids", ids.joinToString(",")).apply()
+    /** Moves the pre-Room "recently played" list from SharedPreferences into play stats, once. */
+    private fun importLegacyRecentHistory() {
+        val raw = prefs.getString("recent_song_ids", null) ?: return
+        val ids = raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        viewModelScope.launch {
+            libraryRepository.importRecentHistory(ids)
+            prefs.edit().remove("recent_song_ids").apply()
+        }
     }
 
     override fun onCleared() {

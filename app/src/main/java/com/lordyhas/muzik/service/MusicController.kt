@@ -108,6 +108,7 @@ class MusicController(private val context: Context) {
 
             updateDuration()
             updatePosition()
+            persist()
         }
 
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
@@ -122,6 +123,7 @@ class MusicController(private val context: Context) {
                 startProgressTracker()
             } else {
                 stopProgressTracker()
+                persist()
             }
         }
 
@@ -199,6 +201,7 @@ class MusicController(private val context: Context) {
         controller.setMediaItems(mediaItems, startIndex, 0L)
         controller.prepare()
         controller.play()
+        persist()
     }
 
     fun addToQueue(song: Song) {
@@ -225,6 +228,7 @@ class MusicController(private val context: Context) {
         }
         _currentQueue.value = updatedQueue
         updateUIQueues()
+        persist()
     }
 
     fun removeQueueItem(index: Int) {
@@ -242,6 +246,7 @@ class MusicController(private val context: Context) {
             }
             clampUserQueueCount()
             updateUIQueues()
+            persist()
         }
     }
 
@@ -268,6 +273,7 @@ class MusicController(private val context: Context) {
                 _currentQueue.value = updatedQueue
             }
             updateUIQueues()
+            persist()
         }
     }
 
@@ -345,6 +351,7 @@ class MusicController(private val context: Context) {
             val newMediaItems = currentFullQueue.subList(safeIndex, currentFullQueue.size).map { it.toMediaItem() }
             controller.replaceMediaItems(safeIndex, controller.mediaItemCount, newMediaItems)
         }
+        persist()
     }
 
     fun toggleRepeat() {
@@ -356,6 +363,87 @@ class MusicController(private val context: Context) {
         }
         controller.repeatMode = nextMode
         _repeatMode.value = nextMode
+        persist()
+    }
+
+    // ─── Session persistence ────────────────────────────────────────────────
+
+    private fun persist() {
+        val controller = mediaController ?: return
+        val queue = _currentQueue.value
+        if (queue.isEmpty()) return
+        PlaybackStateStore.save(
+            context,
+            SavedSession(
+                songIds = queue.map { it.id },
+                index = controller.currentMediaItemIndex,
+                positionMs = controller.currentPosition.coerceAtLeast(0L),
+                userQueueCount = _userQueueCount.value,
+                contextIds = baseContextQueue.map { it.id },
+                shuffle = _isShuffle.value,
+                repeatMode = controller.repeatMode
+            )
+        )
+    }
+
+    /**
+     * Called once the library is loaded. If the player is idle (fresh start), reload the last
+     * session paused at its saved position. If the service is still playing (UI reopened),
+     * rebuild our queue model from the player so the queue screen isn't empty.
+     */
+    fun restoreOrSync(library: List<Song>) {
+        val controller = mediaController ?: return
+        if (library.isEmpty()) return
+        val songMap = library.associateBy { it.id }
+        val saved = PlaybackStateStore.load(context)
+
+        if (controller.mediaItemCount > 0) {
+            if (_currentQueue.value.isNotEmpty()) return
+            val playerIds = (0 until controller.mediaItemCount).map {
+                controller.getMediaItemAt(it).mediaId.toLongOrNull() ?: -1L
+            }
+            val songs = playerIds.mapNotNull { songMap[it] }
+            if (songs.size != playerIds.size) return // queue references songs we can't resolve
+            _currentQueue.value = songs
+            _currentMediaItemIndex.value = controller.currentMediaItemIndex
+            if (saved != null && saved.songIds == playerIds) {
+                baseContextQueue = saved.contextIds.mapNotNull { songMap[it] }
+                _isShuffle.value = saved.shuffle
+                _userQueueCount.value = saved.userQueueCount
+            } else {
+                baseContextQueue = songs
+            }
+            clampUserQueueCount()
+            updateUIQueues()
+            return
+        }
+
+        saved ?: return
+        val savedCurrentId = saved.songIds.getOrNull(saved.index)
+        val songs = saved.songIds.mapNotNull { songMap[it] }
+        if (songs.isEmpty()) return
+
+        // If the saved song was deleted, start from the beginning of the next available one
+        val index = songs.indexOfFirst { it.id == savedCurrentId }
+        val startIndex = if (index >= 0) index else saved.songIds.drop(saved.index)
+            .firstNotNullOfOrNull { id -> songs.indexOfFirst { it.id == id }.takeIf { it >= 0 } } ?: 0
+        val position = if (index >= 0) saved.positionMs else 0L
+
+        baseContextQueue = saved.contextIds.mapNotNull { songMap[it] }.ifEmpty { songs }
+        _isShuffle.value = saved.shuffle
+        _currentQueue.value = songs
+        _currentMediaItemIndex.value = startIndex
+
+        controller.setMediaItems(songs.map { it.toMediaItem() }, startIndex, position)
+        controller.repeatMode = saved.repeatMode
+        _repeatMode.value = saved.repeatMode
+        controller.prepare()
+
+        _userQueueCount.value = saved.userQueueCount
+        clampUserQueueCount()
+        updateUIQueues()
+        updateDuration()
+        _currentPosition.value = position
     }
 
     private fun updateDuration() {
@@ -371,8 +459,10 @@ class MusicController(private val context: Context) {
     private fun startProgressTracker() {
         stopProgressTracker()
         progressJob = scope.launch {
+            var ticks = 0
             while (isActive) {
                 updatePosition()
+                if (++ticks % 10 == 0) persist() // every ~5 s
                 delay(500)
             }
         }
@@ -384,6 +474,7 @@ class MusicController(private val context: Context) {
     }
 
     fun release() {
+        persist()
         stopProgressTracker()
         mediaController?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }

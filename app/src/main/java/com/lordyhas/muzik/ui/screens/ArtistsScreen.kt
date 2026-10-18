@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,6 +42,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import com.lordyhas.muzik.data.model.Artist
+import com.lordyhas.muzik.data.model.ArtistSort
+import com.lordyhas.muzik.data.model.indexLetter
+import com.lordyhas.muzik.ui.components.AlphabetFastScroller
+import com.lordyhas.muzik.ui.components.SortMenuButton
 import com.lordyhas.muzik.ui.components.Artwork
 import com.lordyhas.muzik.ui.components.EmptyState
 import com.lordyhas.muzik.ui.components.LoadingState
@@ -60,7 +67,9 @@ fun ArtistsScreen(
     onArtistClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val artists by viewModel.artists.collectAsState()
+    val artists by viewModel.sortedArtists.collectAsState()
+    val artistSort by viewModel.artistSort.collectAsState()
+    val listState = rememberLazyListState()
     val isLoading by viewModel.isLoading.collectAsState()
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -83,7 +92,14 @@ fun ArtistsScreen(
             .statusBarsPadding()
             .padding(horizontal = 16.dp)
     ) {
-        ScreenHeader(title = "Artists", subtitle = pluralize(artists.size, "artist"))
+        ScreenHeader(title = "Artists", subtitle = pluralize(artists.size, "artist")) {
+            SortMenuButton(
+                options = ArtistSort.entries,
+                selected = artistSort,
+                label = { it.label },
+                onSelect = { viewModel.setArtistSort(it) }
+            )
+        }
 
         MuzikSearchField(
             value = searchQuery,
@@ -102,8 +118,11 @@ fun ArtistsScreen(
                 title = "No artists yet",
                 message = "Artists appear here once music is on your device."
             )
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+            else -> Box(modifier = Modifier.fillMaxSize()) {
+            val scroller = showScroller(artistSort.alphabetical, filteredArtists.size, searchQuery)
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize().padding(end = if (scroller) 18.dp else 0.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)
             ) {
@@ -113,6 +132,14 @@ fun ArtistsScreen(
                         onClick = { onArtistClick(artist.name) }
                     )
                 }
+            }
+            if (scroller) {
+                AlphabetFastScroller(
+                    letters = remember(filteredArtists) { filteredArtists.map { indexLetter(it.name) } },
+                    onScrollToIndex = { listState.scrollToItem(it) },
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                )
+            }
             }
         }
     }
