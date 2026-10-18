@@ -13,7 +13,11 @@ import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.data.model.sortedForAlbum
 import com.lordyhas.muzik.data.repository.MusicRepository
 import com.lordyhas.muzik.data.repository.PlaylistRepository
+import com.lordyhas.muzik.service.EqualizerInfo
+import com.lordyhas.muzik.service.EqualizerSettings
 import com.lordyhas.muzik.service.MusicController
+import com.lordyhas.muzik.service.PlaybackSettings
+import com.lordyhas.muzik.service.SleepTimer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +34,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = MusicRepository(application)
     private val playlistRepository = PlaylistRepository(application)
     val musicController = MusicController(application)
+
+    init {
+        PlaybackSettings.init(application)
+    }
+
+    // Sleep timer / speed / equalizer live in the playback service; the UI only reads & requests changes
+    val sleepTimer: StateFlow<SleepTimer> = PlaybackSettings.sleepTimer
+    val playbackSpeed: StateFlow<Float> = PlaybackSettings.speed
+    val equalizer: StateFlow<EqualizerSettings> = PlaybackSettings.equalizer
+    val equalizerInfo: StateFlow<EqualizerInfo?> = PlaybackSettings.equalizerInfo
 
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
@@ -285,6 +299,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun addToQueue(song: Song) { musicController.addToQueue(song) }
     fun removeQueueItem(index: Int) { musicController.removeQueueItem(index) }
     fun playQueueIndex(index: Int) { musicController.playQueueIndex(index) }
+    fun moveQueueItem(from: Int, to: Int) { musicController.moveQueueItem(from, to) }
+
+    fun setSleepTimer(minutes: Int) = PlaybackSettings.setSleepTimer(minutes)
+    fun setSleepAtEndOfTrack() = PlaybackSettings.setSleepAtEndOfTrack()
+    fun cancelSleepTimer() = PlaybackSettings.cancelSleepTimer()
+    fun setPlaybackSpeed(speed: Float) = PlaybackSettings.setSpeed(speed)
+    fun setEqualizerEnabled(enabled: Boolean) = PlaybackSettings.setEqualizerEnabled(enabled)
+    fun selectEqualizerPreset(preset: Int) = PlaybackSettings.selectEqualizerPreset(preset)
+    fun setEqualizerBandLevel(band: Int, level: Int) = PlaybackSettings.setEqualizerBandLevel(band, level)
+    fun resetEqualizer() = PlaybackSettings.resetEqualizer()
 
     fun navigateToArtist(artistName: String) {
         val target = artists.value.firstOrNull { it.name.equals(artistName, ignoreCase = true) }

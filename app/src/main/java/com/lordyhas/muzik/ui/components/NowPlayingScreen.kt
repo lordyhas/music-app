@@ -3,10 +3,12 @@ package com.lordyhas.muzik.ui.components
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Pause
@@ -40,16 +43,19 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,8 +66,13 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,14 +80,17 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import coil.compose.AsyncImage
 import com.lordyhas.muzik.data.model.Song
+import com.lordyhas.muzik.service.SleepTimer
 import com.lordyhas.muzik.ui.theme.BackgroundDark
 import com.lordyhas.muzik.ui.theme.StrokeSubtle
+import com.lordyhas.muzik.ui.theme.SurfaceElevated
 import com.lordyhas.muzik.ui.theme.TextMuted
 import com.lordyhas.muzik.ui.theme.TextPrimary
 import com.lordyhas.muzik.ui.theme.TextSecondary
 import com.lordyhas.muzik.ui.theme.rememberArtworkColor
 import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlin.math.abs
 
 @UnstableApi
 @Composable
@@ -98,6 +112,11 @@ fun NowPlayingScreen(
     onToggleRepeat: () -> Unit,
     onPlayIndex: (Int) -> Unit,
     onRemoveIndex: (Int) -> Unit,
+    onMoveQueueItem: (from: Int, to: Int) -> Unit,
+    sleepTimer: SleepTimer,
+    playbackSpeed: Float,
+    onSleepTimerClick: () -> Unit,
+    onAudioEffectsClick: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -233,14 +252,19 @@ fun NowPlayingScreen(
                         )
                     }
 
-                    // ── Album Art ────────────────────────────────────────
+                    // ── Album Art (swipe left/right to skip) ─────────────
+                    SwipeableCover(
+                        songKey = song.id,
+                        onSwipeNext = onSkipNext,
+                        onSwipePrevious = onSkipPrevious
+                    ) { coverModifier ->
                     Artwork(
                         uri = song.albumArtUri,
                         shape = RoundedCornerShape(24.dp),
                         iconSize = 96.dp,
                         placeholderTint = accent,
                         contentDescription = "Album artwork",
-                        modifier = Modifier
+                        modifier = coverModifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
                             .scale(artScale)
@@ -252,6 +276,7 @@ fun NowPlayingScreen(
                             )
                             .border(1.dp, StrokeSubtle, RoundedCornerShape(24.dp))
                     )
+                    }
 
                     // ── Title, Artist & Progress ─────────────────────────
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -369,6 +394,32 @@ fun NowPlayingScreen(
                         )
                     }
 
+                    // ── Secondary actions ───────────────────────────────
+                    val sleepRemaining = rememberSleepRemaining(sleepTimer)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        PlayerActionChip(
+                            icon = Icons.Default.Bedtime,
+                            label = when {
+                                sleepRemaining != null -> formatCountdown(sleepRemaining)
+                                sleepTimer == SleepTimer.EndOfTrack -> "End of song"
+                                else -> "Sleep"
+                            },
+                            active = sleepTimer != SleepTimer.Off,
+                            accent = accent,
+                            onClick = onSleepTimerClick
+                        )
+                        PlayerActionChip(
+                            icon = Icons.Default.Tune,
+                            label = if (playbackSpeed != 1f) formatSpeed(playbackSpeed) else "Audio",
+                            active = playbackSpeed != 1f,
+                            accent = accent,
+                            onClick = onAudioEffectsClick
+                        )
+                    }
+
                     // ── Up Next Peek ─────────────────────────────────────
                     Row(
                         modifier = Modifier
@@ -480,6 +531,7 @@ fun NowPlayingScreen(
                             modifier = Modifier.weight(1f)
                         )
                     } else {
+                        val reorderState = rememberReorderState()
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -513,14 +565,25 @@ fun NowPlayingScreen(
                                     key = { i -> "${uqStart + i}_${queue[uqStart + i].id}" }
                                 ) { i ->
                                     val absoluteIndex = uqStart + i
-                                    QueueSongRow(
-                                        song = queue[absoluteIndex],
-                                        isCurrent = false,
-                                        isPlaying = false,
-                                        accent = accent,
-                                        onClick = { onPlayIndex(absoluteIndex) },
-                                        onRemove = { onRemoveIndex(absoluteIndex) }
-                                    )
+                                    ReorderableRow(
+                                        state = reorderState,
+                                        key = "${absoluteIndex}_${queue[absoluteIndex].id}",
+                                        onMove = { steps ->
+                                            val target = (absoluteIndex + steps).coerceIn(uqStart, uqEnd - 1)
+                                            if (target != absoluteIndex) onMoveQueueItem(absoluteIndex, target)
+                                        }
+                                    ) { handle, dragging ->
+                                        QueueSongRow(
+                                            song = queue[absoluteIndex],
+                                            isCurrent = false,
+                                            isPlaying = false,
+                                            accent = accent,
+                                            onClick = { onPlayIndex(absoluteIndex) },
+                                            onRemove = { onRemoveIndex(absoluteIndex) },
+                                            handleModifier = handle,
+                                            isDragging = dragging
+                                        )
+                                    }
                                 }
                             }
 
@@ -539,14 +602,25 @@ fun NowPlayingScreen(
                                     key = { i -> "${contextStart + i}_${queue[contextStart + i].id}" }
                                 ) { i ->
                                     val absoluteIndex = contextStart + i
-                                    QueueSongRow(
-                                        song = queue[absoluteIndex],
-                                        isCurrent = false,
-                                        isPlaying = false,
-                                        accent = accent,
-                                        onClick = { onPlayIndex(absoluteIndex) },
-                                        onRemove = { onRemoveIndex(absoluteIndex) }
-                                    )
+                                    ReorderableRow(
+                                        state = reorderState,
+                                        key = "${absoluteIndex}_${queue[absoluteIndex].id}",
+                                        onMove = { steps ->
+                                            val target = (absoluteIndex + steps).coerceIn(contextStart, queue.size - 1)
+                                            if (target != absoluteIndex) onMoveQueueItem(absoluteIndex, target)
+                                        }
+                                    ) { handle, dragging ->
+                                        QueueSongRow(
+                                            song = queue[absoluteIndex],
+                                            isCurrent = false,
+                                            isPlaying = false,
+                                            accent = accent,
+                                            onClick = { onPlayIndex(absoluteIndex) },
+                                            onRemove = { onRemoveIndex(absoluteIndex) },
+                                            handleModifier = handle,
+                                            isDragging = dragging
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -605,14 +679,22 @@ private fun QueueSongRow(
     accent: Color,
     onClick: () -> Unit,
     onRemove: (() -> Unit)?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    handleModifier: Modifier? = null,
+    isDragging: Boolean = false
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 1.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(if (isCurrent) accent.copy(alpha = 0.14f) else Color.Transparent)
+            .background(
+                when {
+                    isDragging -> SurfaceElevated
+                    isCurrent -> accent.copy(alpha = 0.14f)
+                    else -> Color.Transparent
+                }
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -667,7 +749,98 @@ private fun QueueSongRow(
                 )
             }
         }
+
+        if (handleModifier != null) {
+            DragHandleIcon(modifier = handleModifier)
+        }
     }
+}
+
+/** Pill button under the player controls (sleep timer, audio effects, ...). */
+@Composable
+private fun PlayerActionChip(
+    icon: ImageVector,
+    label: String,
+    active: Boolean,
+    accent: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (active) accent.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.06f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon, contentDescription = null,
+            tint = if (active) accent else TextPrimary.copy(alpha = 0.8f),
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (active) accent else TextPrimary.copy(alpha = 0.8f)
+        )
+    }
+}
+
+/**
+ * Wraps the cover so it can be flicked horizontally: left = next, right = previous.
+ * The cover follows the finger and springs back on release.
+ */
+@Composable
+private fun SwipeableCover(
+    songKey: Long,
+    onSwipeNext: () -> Unit,
+    onSwipePrevious: () -> Unit,
+    content: @Composable (Modifier) -> Unit
+) {
+    val offsetX = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
+    val thresholdPx = with(LocalDensity.current) { 96.dp.toPx() }
+    val currentNext by rememberUpdatedState(onSwipeNext)
+    val currentPrevious by rememberUpdatedState(onSwipePrevious)
+
+    // New song: settle back to center
+    LaunchedEffect(songKey) { offsetX.animateTo(0f, spring(dampingRatio = 0.75f)) }
+
+    content(
+        Modifier
+            .graphicsLayer {
+                translationX = offsetX.value
+                rotationZ = offsetX.value / 60f
+                alpha = 1f - (abs(offsetX.value) / (thresholdPx * 4)).coerceIn(0f, 0.5f)
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        val x = offsetX.value
+                        scope.launch {
+                            when {
+                                x < -thresholdPx -> {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    currentNext()
+                                }
+                                x > thresholdPx -> {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    currentPrevious()
+                                }
+                            }
+                            offsetX.animateTo(0f, spring(dampingRatio = 0.75f))
+                        }
+                    },
+                    onDragCancel = { scope.launch { offsetX.animateTo(0f) } },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        scope.launch { offsetX.snapTo(offsetX.value + amount) }
+                    }
+                )
+            }
+    )
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

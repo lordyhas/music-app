@@ -41,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -60,6 +61,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lordyhas.muzik.ui.components.AddToPlaylistSheet
+import com.lordyhas.muzik.ui.components.AudioEffectsSheet
+import com.lordyhas.muzik.ui.components.SleepTimerSheet
 import com.lordyhas.muzik.ui.components.CreatePlaylistDialog
 import com.lordyhas.muzik.ui.components.MiniPlayer
 import com.lordyhas.muzik.ui.components.NowPlayingScreen
@@ -110,6 +113,12 @@ fun MainAppScreen(
     val songPendingAddToPlaylist by viewModel.songPendingAddToPlaylist.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
     val showCreatePlaylistDialog by viewModel.showCreatePlaylistDialog.collectAsState()
+    val sleepTimer by viewModel.sleepTimer.collectAsState()
+    val playbackSpeed by viewModel.playbackSpeed.collectAsState()
+    val equalizer by viewModel.equalizer.collectAsState()
+    val equalizerInfo by viewModel.equalizerInfo.collectAsState()
+    var showSleepTimerSheet by remember { mutableStateOf(false) }
+    var showAudioEffectsSheet by remember { mutableStateOf(false) }
 
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -220,6 +229,7 @@ fun MainAppScreen(
                             duration = duration,
                             onTogglePlayPause = { viewModel.togglePlayPause() },
                             onSkipNext = { viewModel.skipNext() },
+                            onSkipPrevious = { viewModel.skipPrevious() },
                             onClick = { viewModel.setShowNowPlaying(true) }
                         )
                     }
@@ -397,7 +407,36 @@ fun MainAppScreen(
                 onToggleRepeat = { viewModel.toggleRepeat() },
                 onPlayIndex = { viewModel.playQueueIndex(it) },
                 onRemoveIndex = { viewModel.removeQueueItem(it) },
+                onMoveQueueItem = { from, to -> viewModel.moveQueueItem(from, to) },
+                sleepTimer = sleepTimer,
+                playbackSpeed = playbackSpeed,
+                onSleepTimerClick = { showSleepTimerSheet = true },
+                onAudioEffectsClick = { showAudioEffectsSheet = true },
                 onDismiss = { viewModel.setShowNowPlaying(false) }
+            )
+        }
+
+        if (showSleepTimerSheet) {
+            SleepTimerSheet(
+                timer = sleepTimer,
+                onSetMinutes = { viewModel.setSleepTimer(it) },
+                onEndOfTrack = { viewModel.setSleepAtEndOfTrack() },
+                onCancel = { viewModel.cancelSleepTimer() },
+                onDismiss = { showSleepTimerSheet = false }
+            )
+        }
+
+        if (showAudioEffectsSheet) {
+            AudioEffectsSheet(
+                speed = playbackSpeed,
+                onSpeedChange = { viewModel.setPlaybackSpeed(it) },
+                equalizer = equalizer,
+                equalizerInfo = equalizerInfo,
+                onEqualizerEnabled = { viewModel.setEqualizerEnabled(it) },
+                onPresetSelected = { viewModel.selectEqualizerPreset(it) },
+                onBandLevelChange = { band, level -> viewModel.setEqualizerBandLevel(band, level) },
+                onResetEqualizer = { viewModel.resetEqualizer() },
+                onDismiss = { showAudioEffectsSheet = false }
             )
         }
 
