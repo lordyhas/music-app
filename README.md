@@ -95,6 +95,34 @@ It provides a seamless, fast, and elegant offline listening experience with zero
 
 ---
 
+## CI/CD
+
+Two GitHub Actions workflows live in `.github/workflows/`:
+
+- **CI** (`ci.yml`): on every pull request to `main` or `production` and every push to `main`, runs the unit tests and builds the debug APK (downloadable from the run's artifacts).
+- **Release** (`release.yml`): on every push to `production` (for example after merging `main` into it), runs the tests, builds a **signed** release APK and publishes it as a GitHub Release tagged `v<versionName>`.
+
+**Shipping a version:** bump `versionCode` and `versionName` in `app/build.gradle.kts`, merge to `main`, then merge `main` into `production`. The release fails on purpose if a release for that `versionName` already exists.
+
+**One-time signing setup:** create a keystore once and keep it safe. Every future update must be signed with the same key, or phones will refuse to install it over the old version.
+
+```bash
+keytool -genkeypair -keystore muzik-release.jks -alias muzik -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Then add these repository secrets (**Settings > Secrets and variables > Actions**):
+
+| Secret | Value |
+|--------|-------|
+| `MUZIK_KEYSTORE_BASE64` | the keystore file in base64 (`base64 -w0 muzik-release.jks`) |
+| `MUZIK_KEYSTORE_PASSWORD` | the keystore password |
+| `MUZIK_KEY_ALIAS` | the key alias (`muzik` above) |
+| `MUZIK_KEY_PASSWORD` | the key password |
+
+Locally, release builds stay unsigned unless `MUZIK_KEYSTORE_PATH` and the three password/alias variables are set.
+
+---
+
 ## Project Structure
 
 ```text

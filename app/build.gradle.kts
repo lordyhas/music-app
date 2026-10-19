@@ -19,8 +19,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Release signing comes from the environment (set by the CD workflow from GitHub secrets).
+    // Without it, local release builds stay unsigned as before.
+    val releaseKeystore = System.getenv("MUZIK_KEYSTORE_PATH")
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("MUZIK_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("MUZIK_KEY_ALIAS")
+                keyPassword = System.getenv("MUZIK_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
