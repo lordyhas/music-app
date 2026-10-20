@@ -51,13 +51,13 @@ fun PlaylistsScreen(
     viewModel: MusicViewModel,
     onSmartPlaylistClick: (SmartPlaylistType) -> Unit,
     onPlaylistClick: (String) -> Unit,
+    onEditPlaylist: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val playlists by viewModel.playlists.collectAsState()
     val smartPlaylists by viewModel.smartPlaylists.collectAsState()
     val showCreateDialog by viewModel.showCreatePlaylistDialog.collectAsState()
     val songPendingAddToPlaylist by viewModel.songPendingAddToPlaylist.collectAsState()
-    val playlistPendingRename by viewModel.playlistPendingRename.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val playingPlaylistId by viewModel.playingPlaylistId.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
@@ -124,7 +124,7 @@ fun PlaylistsScreen(
                                 isCurrent = playlist.id == playingPlaylistId,
                                 isPlaying = isPlaying,
                                 onClick = { onPlaylistClick(playlist.id) },
-                                onRename = { viewModel.setPlaylistPendingRename(playlist) },
+                                onEdit = { onEditPlaylist(playlist.id) },
                                 onDelete = { viewModel.deletePlaylist(playlist.id) }
                             )
                         }
@@ -156,19 +156,6 @@ fun PlaylistsScreen(
                 viewModel.setShowCreatePlaylistDialog(false)
             },
             onDismiss = { viewModel.setShowCreatePlaylistDialog(false) }
-        )
-    }
-
-    playlistPendingRename?.let { playlist ->
-        CreatePlaylistDialog(
-            title = "Rename playlist",
-            initialName = playlist.name,
-            confirmLabel = "Save",
-            onConfirm = { newName ->
-                viewModel.renamePlaylist(playlist.id, newName)
-                viewModel.setPlaylistPendingRename(null)
-            },
-            onDismiss = { viewModel.setPlaylistPendingRename(null) }
         )
     }
 }

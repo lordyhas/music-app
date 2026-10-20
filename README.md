@@ -13,7 +13,8 @@ It provides a seamless, fast, and elegant offline listening experience with zero
   - Background playback via a dedicated foreground service (`MediaLibraryService`).
   - Lockscreen controls and system notification media controls.
   - Full playback queue with shuffle and repeat modes (*Repeat All*, *Repeat One*, *Off*).
-  - **Spotify-style queue**: "Add to queue" songs play next in order; drag handles to reorder upcoming songs.
+  - **Spotify-style queue**: "Add to queue" songs play next in order; drag handles to reorder upcoming songs, swipe a song left to remove it (with Undo). Rows slide smoothly as the queue changes.
+  - **Swipe to queue**: swipe any song right in an album, artist, playlist, folder or song list to add it to the queue.
   - **Resume where you left off**: queue, song and position are restored on the next launch, and the system can resume your last session (e.g. a Bluetooth play button) even after the app was closed.
   - **Sleep timer**: 5–90 minutes or "end of current song", with a gentle fade-out. Keeps working with the app closed.
   - **Equalizer & playback speed**: system equalizer with presets and per-band sliders, and 0.5x–2x speed, remembered across launches.
@@ -32,7 +33,7 @@ It provides a seamless, fast, and elegant offline listening experience with zero
   - **Folders**: browse music by device folder, and hide folders you don't want (voice notes, recordings, ringtones...) so their audio never shows up anywhere, Android Auto included.
   - **Library filters**: hide voice recordings (Android 12+) and skip short clips like alarms and notification sounds.
   - **Search**: one search across songs, artists, albums and playlists.
-  - **Custom Playlists**: create, rename, reorder and delete playlists backed by **Room**.
+  - **Custom Playlists**: create and delete playlists backed by **Room**, and edit them Spotify-style: rename, remove songs and drag to reorder, saved in one go (or discarded).
   - **Smart Playlists**: *Liked Songs*, *Most Played*, *Recently Added* and *Rediscover*, built automatically from your likes and listening history.
 
 - **Everywhere you listen**:
