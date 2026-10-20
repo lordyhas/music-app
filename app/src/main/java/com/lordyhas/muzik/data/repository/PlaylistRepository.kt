@@ -41,10 +41,6 @@ class PlaylistRepository(context: Context) {
         // Cascade delete in FK removes playlist_songs rows automatically
     }
 
-    suspend fun renamePlaylist(id: String, newName: String) {
-        dao.renamePlaylist(id, newName.trim())
-    }
-
     suspend fun addSongToPlaylist(playlistId: String, songId: Long) {
         val nextPosition = dao.getMaxPosition(playlistId) + 1
         dao.insertPlaylistSong(
@@ -58,6 +54,15 @@ class PlaylistRepository(context: Context) {
 
     suspend fun removeSongFromPlaylist(playlistId: String, songId: Long) {
         dao.removeSongFromPlaylist(playlistId, songId)
+    }
+
+    /** Applies an Edit playlist session at once: new name, removed songs, then the new order. */
+    suspend fun applyEdits(playlistId: String, name: String, removedSongIds: Collection<Long>, orderedSongIds: List<Long>) {
+        db.withTransaction {
+            dao.renamePlaylist(playlistId, name.trim())
+            removedSongIds.forEach { dao.removeSongFromPlaylist(playlistId, it) }
+            orderedSongIds.forEachIndexed { index, songId -> dao.updatePosition(playlistId, songId, index) }
+        }
     }
 
     /** Rewrites song positions so the playlist follows [orderedSongIds]. */

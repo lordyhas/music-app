@@ -450,7 +450,8 @@ fun DetailHero(
     onSubtitleClick: (() -> Unit)? = null,
     circular: Boolean = false,
     placeholderIcon: ImageVector = Icons.Default.MusicNote,
-    cover: (@Composable (Modifier) -> Unit)? = null
+    cover: (@Composable (Modifier) -> Unit)? = null,
+    extra: (@Composable () -> Unit)? = null
 ) {
     val accent = rememberArtworkColor(artworkUri)
     val coverShape = if (circular) CircleShape else RoundedCornerShape(20.dp)
@@ -548,6 +549,11 @@ fun DetailHero(
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
+
+            if (extra != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                extra()
+            }
 
             if (onPlay != null && onShuffle != null) {
                 Spacer(modifier = Modifier.height(20.dp))

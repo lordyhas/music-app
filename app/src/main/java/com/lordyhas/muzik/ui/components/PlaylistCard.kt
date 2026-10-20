@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material3.AlertDialog
@@ -57,7 +57,7 @@ import com.lordyhas.muzik.ui.theme.TextSecondary
 fun PlaylistCard(
     playlist: Playlist,
     onClick: () -> Unit,
-    onRename: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     isCurrent: Boolean = false,
@@ -133,10 +133,10 @@ fun PlaylistCard(
                     modifier = Modifier.background(SurfaceElevated)
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Rename", color = TextPrimary, style = MaterialTheme.typography.bodyMedium) },
+                        text = { Text("Edit playlist", color = TextPrimary, style = MaterialTheme.typography.bodyMedium) },
                         leadingIcon = {
                             Icon(
-                                Icons.Default.DriveFileRenameOutline,
+                                Icons.Default.Edit,
                                 contentDescription = null,
                                 tint = AccentPrimary,
                                 modifier = Modifier.size(18.dp)
@@ -144,7 +144,7 @@ fun PlaylistCard(
                         },
                         onClick = {
                             isMenuExpanded = false
-                            onRename()
+                            onEdit()
                         }
                     )
                     DropdownMenuItem(

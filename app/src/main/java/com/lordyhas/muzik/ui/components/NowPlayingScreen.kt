@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Bedtime
@@ -86,6 +87,7 @@ import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.data.repository.LyricsState
 import com.lordyhas.muzik.service.SleepTimer
 import com.lordyhas.muzik.ui.theme.BackgroundDark
+import com.lordyhas.muzik.ui.theme.DangerRed
 import com.lordyhas.muzik.ui.theme.StrokeSubtle
 import com.lordyhas.muzik.ui.theme.SurfaceElevated
 import com.lordyhas.muzik.ui.theme.TextMuted
@@ -563,6 +565,25 @@ fun NowPlayingScreen(
                         )
                     } else {
                         val reorderState = rememberReorderState()
+                        // Stable row identities: a song queued twice is "id#1" and "id#2", so removing
+                        // or moving one song doesn't re-key every row below it (which kills animations)
+                        val queueKeys = remember(queue) {
+                            val seen = HashMap<Long, Int>()
+                            queue.map { s ->
+                                val n = (seen[s.id] ?: 0) + 1
+                                seen[s.id] = n
+                                "${s.id}#$n"
+                            }
+                        }
+                        val removeAction = { index: Int ->
+                            SwipeAction(
+                                icon = Icons.Default.Delete,
+                                label = "Remove from queue",
+                                color = DangerRed,
+                                dismiss = true,
+                                onTrigger = { onRemoveIndex(index) }
+                            )
+                        }
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -571,7 +592,7 @@ fun NowPlayingScreen(
                         ) {
                             // 1. Now playing
                             if (currentIndex in queue.indices) {
-                                item {
+                                item(key = "now_playing") {
                                     QueueSectionLabel("NOW PLAYING", color = accent, topPadding = 8.dp)
                                     QueueSongRow(
                                         song = queue[currentIndex],
@@ -586,24 +607,29 @@ fun NowPlayingScreen(
 
                             // 2. Songs the user queued manually
                             if (userQueueCount > 0 && currentIndex + 1 < queue.size) {
-                                item { QueueSectionLabel("NEXT IN QUEUE", color = TextPrimary) }
+                                item(key = "label_user_queue") {
+                                    QueueSectionLabel("NEXT IN QUEUE", color = TextPrimary, modifier = Modifier.animateItem())
+                                }
 
                                 val uqStart = currentIndex + 1
                                 val uqEnd = (uqStart + userQueueCount).coerceAtMost(queue.size)
 
                                 items(
                                     count = uqEnd - uqStart,
-                                    key = { i -> "${uqStart + i}_${queue[uqStart + i].id}" }
+                                    key = { i -> queueKeys[uqStart + i] }
                                 ) { i ->
                                     val absoluteIndex = uqStart + i
+                                    val rowKey = queueKeys[absoluteIndex]
                                     ReorderableRow(
                                         state = reorderState,
-                                        key = "${absoluteIndex}_${queue[absoluteIndex].id}",
+                                        key = rowKey,
                                         onMove = { steps ->
                                             val target = (absoluteIndex + steps).coerceIn(uqStart, uqEnd - 1)
                                             if (target != absoluteIndex) onMoveQueueItem(absoluteIndex, target)
-                                        }
+                                        },
+                                        modifier = Modifier.animateItem(placementSpec = reorderState.placementSpec(rowKey))
                                     ) { handle, dragging ->
+                                      SwipeActionBox(endToStart = removeAction(absoluteIndex)) {
                                         QueueSongRow(
                                             song = queue[absoluteIndex],
                                             isCurrent = false,
@@ -614,6 +640,7 @@ fun NowPlayingScreen(
                                             handleModifier = handle,
                                             isDragging = dragging
                                         )
+                                      }
                                     }
                                 }
                             }
@@ -621,26 +648,30 @@ fun NowPlayingScreen(
                             // 3. Rest of the album / playlist being played
                             val contextStart = currentIndex + 1 + userQueueCount
                             if (contextStart < queue.size) {
-                                item {
+                                item(key = "label_context") {
                                     QueueSectionLabel(
                                         "NEXT FROM: " + song.album.ifEmpty { "Library" }.uppercase(Locale.getDefault()),
-                                        color = TextSecondary
+                                        color = TextSecondary,
+                                        modifier = Modifier.animateItem()
                                     )
                                 }
 
                                 items(
                                     count = queue.size - contextStart,
-                                    key = { i -> "${contextStart + i}_${queue[contextStart + i].id}" }
+                                    key = { i -> queueKeys[contextStart + i] }
                                 ) { i ->
                                     val absoluteIndex = contextStart + i
+                                    val rowKey = queueKeys[absoluteIndex]
                                     ReorderableRow(
                                         state = reorderState,
-                                        key = "${absoluteIndex}_${queue[absoluteIndex].id}",
+                                        key = rowKey,
                                         onMove = { steps ->
                                             val target = (absoluteIndex + steps).coerceIn(contextStart, queue.size - 1)
                                             if (target != absoluteIndex) onMoveQueueItem(absoluteIndex, target)
-                                        }
+                                        },
+                                        modifier = Modifier.animateItem(placementSpec = reorderState.placementSpec(rowKey))
                                     ) { handle, dragging ->
+                                      SwipeActionBox(endToStart = removeAction(absoluteIndex)) {
                                         QueueSongRow(
                                             song = queue[absoluteIndex],
                                             isCurrent = false,
@@ -651,6 +682,7 @@ fun NowPlayingScreen(
                                             handleModifier = handle,
                                             isDragging = dragging
                                         )
+                                      }
                                     }
                                 }
                             }
@@ -691,14 +723,19 @@ private fun ToggleControl(
 }
 
 @Composable
-private fun QueueSectionLabel(text: String, color: Color, topPadding: androidx.compose.ui.unit.Dp = 20.dp) {
+private fun QueueSectionLabel(
+    text: String,
+    color: Color,
+    topPadding: androidx.compose.ui.unit.Dp = 20.dp,
+    modifier: Modifier = Modifier
+) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
         color = color,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = topPadding, bottom = 6.dp)
+        modifier = modifier.padding(start = 20.dp, end = 20.dp, top = topPadding, bottom = 6.dp)
     )
 }
 

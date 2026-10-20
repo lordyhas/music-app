@@ -87,142 +87,154 @@ fun SongItem(
         label = "item_bg"
     )
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(backgroundColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (showTrackNumber) {
-            Box(modifier = Modifier.width(32.dp), contentAlignment = Alignment.Center) {
-                if (isSelected) {
-                    EqualizerBars(isAnimating = isPlaying, modifier = Modifier.size(16.dp))
-                } else {
-                    Text(
-                        text = song.trackNumber?.takeIf { it > 0 }?.toString() ?: "–",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = TextMuted,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-        }
+    // Spotify-style: swipe right to add to queue (the row springs back)
+    val swipeToQueue = onAddToQueue?.let {
+        SwipeAction(
+            icon = Icons.AutoMirrored.Filled.QueueMusic,
+            label = "Add to queue",
+            color = AccentPrimary,
+            onTrigger = it
+        )
+    }
 
-        if (showArtwork) {
-            Box(contentAlignment = Alignment.Center) {
-                Artwork(
-                    uri = song.albumArtUri,
-                    shape = RoundedCornerShape(10.dp),
-                    iconSize = 22.dp,
-                    modifier = Modifier.size(52.dp)
-                )
-                if (isSelected && !showTrackNumber) {
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color.Black.copy(alpha = 0.5f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        EqualizerBars(isAnimating = isPlaying, modifier = Modifier.size(20.dp))
+    SwipeActionBox(modifier = modifier.fillMaxWidth(), startToEnd = swipeToQueue) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(backgroundColor)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (showTrackNumber) {
+                Box(modifier = Modifier.width(32.dp), contentAlignment = Alignment.Center) {
+                    if (isSelected) {
+                        EqualizerBars(isAnimating = isPlaying, modifier = Modifier.size(16.dp))
+                    } else {
+                        Text(
+                            text = song.trackNumber?.takeIf { it > 0 }?.toString() ?: "–",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = TextMuted,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
+                Spacer(modifier = Modifier.width(8.dp))
             }
-            Spacer(modifier = Modifier.width(14.dp))
-        }
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
-                ),
-                color = if (isSelected) AccentPrimary else TextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isLiked) {
-                    Icon(
-                        Icons.Default.Favorite,
-                        contentDescription = "Liked",
-                        tint = AccentPrimary,
-                        modifier = Modifier.size(12.dp)
+            if (showArtwork) {
+                Box(contentAlignment = Alignment.Center) {
+                    Artwork(
+                        uri = song.albumArtUri,
+                        shape = RoundedCornerShape(10.dp),
+                        iconSize = 22.dp,
+                        modifier = Modifier.size(52.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    if (isSelected && !showTrackNumber) {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            EqualizerBars(isAnimating = isPlaying, modifier = Modifier.size(20.dp))
+                        }
+                    }
                 }
+                Spacer(modifier = Modifier.width(14.dp))
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "${song.artist} • ${song.formattedDuration()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
+                    text = song.title,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                    ),
+                    color = if (isSelected) AccentPrimary else TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isLiked) {
+                        Icon(
+                            Icons.Default.Favorite,
+                            contentDescription = "Liked",
+                            tint = AccentPrimary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(
+                        text = "${song.artist} • ${song.formattedDuration()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(4.dp))
 
-        Box {
-            IconButton(
-                onClick = { isMenuExpanded = true },
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Song options",
-                    tint = TextSecondary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            DropdownMenu(
-                expanded = isMenuExpanded,
-                onDismissRequest = { isMenuExpanded = false },
-                modifier = Modifier.background(SurfaceElevated)
-            ) {
-                @Composable
-                fun MenuItem(label: String, icon: ImageVector, tint: Color, action: () -> Unit) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                label,
-                                color = if (tint == DangerRed) DangerRed else TextPrimary,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-                        },
-                        onClick = {
-                            isMenuExpanded = false
-                            action()
-                        }
+            Box {
+                IconButton(
+                    onClick = { isMenuExpanded = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Song options",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
-                onToggleLike?.let {
-                    MenuItem(
-                        if (isLiked) "Remove from Liked Songs" else "Add to Liked Songs",
-                        if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        AccentPrimary,
-                        it
-                    )
-                }
-                onAddToQueue?.let { MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic, AccentPrimary, it) }
-                onAddToPlaylist?.let { MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd, AccentPrimary, it) }
-                onGoToArtist?.let { MenuItem("Go to artist", Icons.Default.Person, TextSecondary, it) }
-                onGoToAlbum?.let { MenuItem("Go to album", Icons.Default.Album, TextSecondary, it) }
-                onRemoveFromPlaylist?.let { MenuItem("Remove from playlist", Icons.Default.Delete, DangerRed, it) }
-                onShowDetails?.let { MenuItem("Song details", Icons.Default.Info, TextSecondary, it) }
-            }
-        }
+                DropdownMenu(
+                    expanded = isMenuExpanded,
+                    onDismissRequest = { isMenuExpanded = false },
+                    modifier = Modifier.background(SurfaceElevated)
+                ) {
+                    @Composable
+                    fun MenuItem(label: String, icon: ImageVector, tint: Color, action: () -> Unit) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    label,
+                                    color = if (tint == DangerRed) DangerRed else TextPrimary,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+                            },
+                            onClick = {
+                                isMenuExpanded = false
+                                action()
+                            }
+                        )
+                    }
 
-        trailing?.invoke()
+                    onToggleLike?.let {
+                        MenuItem(
+                            if (isLiked) "Remove from Liked Songs" else "Add to Liked Songs",
+                            if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            AccentPrimary,
+                            it
+                        )
+                    }
+                    onAddToQueue?.let { MenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic, AccentPrimary, it) }
+                    onAddToPlaylist?.let { MenuItem("Add to playlist", Icons.AutoMirrored.Filled.PlaylistAdd, AccentPrimary, it) }
+                    onGoToArtist?.let { MenuItem("Go to artist", Icons.Default.Person, TextSecondary, it) }
+                    onGoToAlbum?.let { MenuItem("Go to album", Icons.Default.Album, TextSecondary, it) }
+                    onRemoveFromPlaylist?.let { MenuItem("Remove from playlist", Icons.Default.Delete, DangerRed, it) }
+                    onShowDetails?.let { MenuItem("Song details", Icons.Default.Info, TextSecondary, it) }
+                }
+            }
+
+            trailing?.invoke()
+        }
     }
 }
 
