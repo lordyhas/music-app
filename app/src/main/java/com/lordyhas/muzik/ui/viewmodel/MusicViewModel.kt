@@ -21,6 +21,7 @@ import com.lordyhas.muzik.data.model.LibraryFilter
 import com.lordyhas.muzik.data.model.filteredBy
 import com.lordyhas.muzik.data.model.groupIntoAlbums
 import com.lordyhas.muzik.data.model.groupIntoFolders
+import com.lordyhas.muzik.data.model.mergeEditedOrder
 import com.lordyhas.muzik.data.repository.LibraryFilterStore
 import com.lordyhas.muzik.data.repository.LibraryRepository
 import com.lordyhas.muzik.data.repository.LyricsRepository
@@ -32,6 +33,7 @@ import com.lordyhas.muzik.service.EqualizerSettings
 import com.lordyhas.muzik.service.MusicController
 import com.lordyhas.muzik.service.PlaybackSettings
 import com.lordyhas.muzik.service.SleepTimer
+import com.lordyhas.muzik.ui.components.UiMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -39,7 +41,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -172,9 +177,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _songPendingAddToPlaylist = MutableStateFlow<Song?>(null)
     val songPendingAddToPlaylist: StateFlow<Song?> = _songPendingAddToPlaylist.asStateFlow()
 
-    /** Playlist being renamed (triggers rename dialog). */
-    private val _playlistPendingRename = MutableStateFlow<Playlist?>(null)
-    val playlistPendingRename: StateFlow<Playlist?> = _playlistPendingRename.asStateFlow()
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -484,8 +486,27 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun setShowQueue(show: Boolean) { _showQueue.value = show }
     fun selectSongForDetails(song: Song?) { _selectedSongForDetails.value = song }
 
-    fun addToQueue(song: Song) { musicController.addToQueue(song) }
-    fun removeQueueItem(index: Int) { musicController.removeQueueItem(index) }
+    // ─── Confirmations (snackbar) ─────────────────────────────────────────────
+
+    private val _messages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 8)
+    val messages: SharedFlow<UiMessage> = _messages.asSharedFlow()
+
+    private fun showMessage(text: String, actionLabel: String? = null, onAction: (() -> Unit)? = null) {
+        _messages.tryEmit(UiMessage(text, actionLabel, onAction))
+    }
+
+    fun addToQueue(song: Song) {
+        musicController.addToQueue(song)
+        showMessage("Added to queue")
+    }
+
+    fun removeQueueItem(index: Int) {
+        val song = currentQueue.value.getOrNull(index) ?: return
+        val current = currentQueueIndex.value
+        val inUserQueue = index > current && index <= current + userQueueCount.value
+        musicController.removeQueueItem(index)
+        showMessage("Removed from queue", "Undo") { musicController.insertQueueItem(index, song, inUserQueue) }
+    }
     fun playQueueIndex(index: Int) { musicController.playQueueIndex(index) }
     fun moveQueueItem(from: Int, to: Int) { musicController.moveQueueItem(from, to) }
 
@@ -525,7 +546,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setShowCreatePlaylistDialog(show: Boolean) { _showCreatePlaylistDialog.value = show }
     fun setSongPendingAddToPlaylist(song: Song?) { _songPendingAddToPlaylist.value = song }
-    fun setPlaylistPendingRename(playlist: Playlist?) { _playlistPendingRename.value = playlist }
 
     /** Creates a playlist and optionally adds [initialSongId] to it once it exists. */
     fun createPlaylist(name: String, initialSongId: Long? = null) {
@@ -544,27 +564,36 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun renamePlaylist(id: String, newName: String) {
-        if (newName.isBlank()) return
-        viewModelScope.launch { playlistRepository.renamePlaylist(id, newName) }
-    }
-
     fun addSongToPlaylist(playlistId: String, songId: Long) {
         viewModelScope.launch { playlistRepository.addSongToPlaylist(playlistId, songId) }
     }
 
     fun removeSongFromPlaylist(playlistId: String, songId: Long) {
+        val playlist = playlists.value.firstOrNull { it.id == playlistId }
         viewModelScope.launch { playlistRepository.removeSongFromPlaylist(playlistId, songId) }
+        if (playlist != null) {
+            showMessage("Removed from ${playlist.name}", "Undo") {
+                viewModelScope.launch {
+                    playlistRepository.addSongToPlaylist(playlistId, songId)
+                    playlistRepository.reorder(playlistId, playlist.songIds)
+                }
+            }
+        }
     }
 
-    /** Moves [fromSongId] to where [toSongId] currently sits in the playlist. */
-    fun moveSongInPlaylist(playlist: Playlist, fromSongId: Long, toSongId: Long) {
-        val ids = playlist.songIds.toMutableList()
-        val from = ids.indexOf(fromSongId)
-        val to = ids.indexOf(toSongId)
-        if (from < 0 || to < 0 || from == to) return
-        ids.add(to, ids.removeAt(from))
-        viewModelScope.launch { playlistRepository.reorder(playlist.id, ids) }
+    /**
+     * Saves an Edit playlist session: [name], and [editedSongs] as the remaining songs in their new
+     * order. Songs the edit screen didn't show (missing from the device, or in hidden folders) keep
+     * their positions.
+     */
+    fun savePlaylistEdits(playlist: Playlist, name: String, editedSongs: List<Song>) {
+        val shownIds = playlist.songs.map { it.id }.toSet()
+        val keptIds = editedSongs.map { it.id }
+        val removedIds = shownIds - keptIds.toSet()
+        val order = mergeEditedOrder(playlist.songIds, shownIds, keptIds)
+        viewModelScope.launch {
+            playlistRepository.applyEdits(playlist.id, name.ifBlank { playlist.name }, removedIds, order)
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

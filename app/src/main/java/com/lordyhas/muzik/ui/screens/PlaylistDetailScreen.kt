@@ -4,9 +4,18 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.background
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PlaylistPlay
@@ -19,15 +28,12 @@ import androidx.media3.common.util.UnstableApi
 import com.lordyhas.muzik.data.model.Playlist
 import com.lordyhas.muzik.ui.components.DetailHero
 import com.lordyhas.muzik.ui.components.DetailNotFound
-import com.lordyhas.muzik.ui.components.DragHandleIcon
-import com.lordyhas.muzik.ui.components.ReorderableRow
-import com.lordyhas.muzik.ui.components.rememberReorderState
-import com.lordyhas.muzik.ui.theme.SurfaceElevated
 import com.lordyhas.muzik.ui.components.DetailScaffold
 import com.lordyhas.muzik.ui.components.EmptyState
 import com.lordyhas.muzik.ui.components.PlaylistCollage
 import com.lordyhas.muzik.ui.components.SongItem
 import com.lordyhas.muzik.ui.components.pluralize
+import com.lordyhas.muzik.ui.theme.TextPrimary
 import com.lordyhas.muzik.ui.viewmodel.MusicViewModel
 
 @OptIn(UnstableApi::class)
@@ -38,6 +44,7 @@ fun PlaylistDetailScreen(
     onBackClick: () -> Unit,
     onGoToArtist: (String) -> Unit,
     onGoToAlbum: (Long) -> Unit,
+    onEditClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BackHandler(enabled = true) {
@@ -60,8 +67,6 @@ fun PlaylistDetailScreen(
     val firstArtworkUri = songs.firstOrNull { it.albumArtUri != null }?.albumArtUri
     val hasSongs = songs.isNotEmpty()
 
-    val reorderState = rememberReorderState()
-
     DetailScaffold(title = playlist.name, onBack = onBackClick, modifier = modifier) {
         item(key = "hero") {
             DetailHero(
@@ -74,7 +79,20 @@ fun PlaylistDetailScreen(
                 placeholderIcon = Icons.Default.PlaylistPlay,
                 cover = { coverModifier -> PlaylistCollage(playlist = playlist, modifier = coverModifier) },
                 onPlay = if (hasSongs) ({ viewModel.playPlaylist(playlist) }) else null,
-                onShuffle = if (hasSongs) ({ viewModel.playPlaylist(playlist, shuffle = true) }) else null
+                onShuffle = if (hasSongs) ({ viewModel.playPlaylist(playlist, shuffle = true) }) else null,
+                extra = {
+                    OutlinedButton(
+                        onClick = onEditClick,
+                        shape = CircleShape,
+                        border = BorderStroke(1.dp, TextPrimary.copy(alpha = 0.25f)),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Edit playlist", style = MaterialTheme.typography.labelLarge, color = TextPrimary)
+                    }
+                }
             )
         }
 
@@ -83,22 +101,13 @@ fun PlaylistDetailScreen(
                 EmptyState(
                     icon = Icons.Default.LibraryMusic,
                     title = "This playlist is empty",
-                    message = "Add songs from the ⋮ menu on any track.",
+                    message = "Add songs from the ⋮ menu on any track, or swipe right to queue them.",
                     modifier = Modifier.fillMaxWidth().height(260.dp)
                 )
             }
         } else {
-            itemsIndexed(songs, key = { _, song -> song.contentUri.toString() }) { index, song ->
+            items(songs, key = { song -> song.id }) { song ->
                 val isSelected = currentSong?.id == song.id
-                ReorderableRow(
-                    state = reorderState,
-                    key = song.id,
-                    onMove = { steps ->
-                        val target = (index + steps).coerceIn(0, songs.lastIndex)
-                        if (target != index) viewModel.moveSongInPlaylist(playlist, song.id, songs[target].id)
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                ) { handle, dragging ->
                 SongItem(
                     song = song,
                     isSelected = isSelected,
@@ -111,12 +120,11 @@ fun PlaylistDetailScreen(
                     onGoToArtist = { onGoToArtist(song.artist) },
                     onGoToAlbum = { onGoToAlbum(song.albumId) },
                     onShowDetails = { viewModel.selectSongForDetails(song) },
-                    trailing = { DragHandleIcon(modifier = handle) },
-                    modifier = if (dragging) {
-                        Modifier.background(SurfaceElevated, RoundedCornerShape(14.dp))
-                    } else Modifier
+                    // Removing a song (menu, or Undo bringing it back) slides the list instead of jumping
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp)
+                        .animateItem()
                 )
-                }
             }
         }
     }

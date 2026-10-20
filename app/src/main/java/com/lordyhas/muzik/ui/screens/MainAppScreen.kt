@@ -44,6 +44,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
@@ -66,6 +67,7 @@ import com.lordyhas.muzik.ui.components.AudioEffectsSheet
 import com.lordyhas.muzik.ui.components.SleepTimerSheet
 import com.lordyhas.muzik.ui.components.CreatePlaylistDialog
 import com.lordyhas.muzik.ui.components.MiniPlayer
+import com.lordyhas.muzik.ui.components.MuzikSnackbarHost
 import com.lordyhas.muzik.ui.components.NowPlayingScreen
 import com.lordyhas.muzik.ui.components.PermissionRequestView
 import com.lordyhas.muzik.ui.components.SongDetailsDialog
@@ -92,6 +94,8 @@ enum class NavigationTab(
     ARTISTS("artists", "Artists", Icons.Filled.Person, Icons.Outlined.Person),
     PLAYLISTS("playlists", "Playlists", Icons.AutoMirrored.Filled.PlaylistPlay, Icons.AutoMirrored.Outlined.PlaylistPlay)
 }
+
+private const val PLAYLIST_EDIT_ROUTE = "playlist/{playlistId}/edit"
 
 @UnstableApi
 @Composable
@@ -123,6 +127,8 @@ fun MainAppScreen(
     val equalizerInfo by viewModel.equalizerInfo.collectAsState()
     var showSleepTimerSheet by remember { mutableStateOf(false) }
     var showAudioEffectsSheet by remember { mutableStateOf(false) }
+    // Height of mini player + nav bar, so confirmations appear just above them
+    var bottomBarHeight by remember { mutableStateOf(0.dp) }
 
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -211,11 +217,19 @@ fun MainAppScreen(
         navController.navigate("playlist/$encoded")
     }
 
+    fun navigateToPlaylistEdit(playlistId: String) {
+        val encoded = URLEncoder.encode(playlistId, StandardCharsets.UTF_8.toString())
+        navController.navigate("playlist/$encoded/edit")
+    }
+
+    // The editor is full screen, like Spotify's: no mini player or tab bar under it
+    val isEditingPlaylist = currentRoute == PLAYLIST_EDIT_ROUTE
+
     Box(modifier = modifier.fillMaxSize().background(Color.Transparent)) {
         Scaffold(
             containerColor = BackgroundDark,
             bottomBar = {
-                Column(
+                if (!isEditingPlaylist) Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
@@ -286,6 +300,7 @@ fun MainAppScreen(
                 }
             }
         ) { paddingValues ->
+            bottomBarHeight = paddingValues.calculateBottomPadding()
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -338,7 +353,8 @@ fun MainAppScreen(
                         PlaylistsScreen(
                             viewModel = viewModel,
                             onSmartPlaylistClick = { type -> navController.navigate("smart/${type.name}") },
-                            onPlaylistClick = { id -> navigateToPlaylist(id) }
+                            onPlaylistClick = { id -> navigateToPlaylist(id) },
+                            onEditPlaylist = { id -> navigateToPlaylistEdit(id) }
                         )
                     }
 
@@ -432,7 +448,24 @@ fun MainAppScreen(
                             viewModel = viewModel,
                             onBackClick = { safePopBack() },
                             onGoToArtist = { name -> navigateToArtist(name) },
-                            onGoToAlbum = { id -> navigateToAlbum(id) }
+                            onGoToAlbum = { id -> navigateToAlbum(id) },
+                            onEditClick = { navigateToPlaylistEdit(playlistId) }
+                        )
+                    }
+
+                    composable(
+                        route = PLAYLIST_EDIT_ROUTE,
+                        arguments = listOf(navArgument("playlistId") { type = NavType.StringType }),
+                        enterTransition = { slideInVertically(initialOffsetY = { it }) + fadeIn() },
+                        exitTransition = { fadeOut() },
+                        popEnterTransition = { fadeIn() },
+                        popExitTransition = { slideOutVertically(targetOffsetY = { it }) + fadeOut() }
+                    ) { backStackEntry ->
+                        val encodedId = backStackEntry.arguments?.getString("playlistId").orEmpty()
+                        PlaylistEditScreen(
+                            playlistId = URLDecoder.decode(encodedId, StandardCharsets.UTF_8.toString()),
+                            viewModel = viewModel,
+                            onClose = { safePopBack() }
                         )
                     }
                 }
@@ -525,6 +558,17 @@ fun MainAppScreen(
                 onDismiss = { viewModel.setSongPendingAddToPlaylist(null) }
             )
         }
+
+        // Confirmations ("Added to queue", "Removed · Undo"), above every overlay
+        MuzikSnackbarHost(
+            messages = viewModel.messages,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .then(
+                    if (showNowPlaying) Modifier.navigationBarsPadding().padding(bottom = 12.dp)
+                    else Modifier.padding(bottom = bottomBarHeight)
+                )
+        )
 
         // ─── Create Playlist Dialog (global, triggered from AddToPlaylistSheet) ─
         if (showCreatePlaylistDialog && songPendingAddToPlaylist != null) {

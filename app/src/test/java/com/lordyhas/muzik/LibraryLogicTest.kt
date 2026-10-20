@@ -5,6 +5,7 @@ import com.lordyhas.muzik.data.model.LibraryFilter
 import com.lordyhas.muzik.data.model.Song
 import com.lordyhas.muzik.data.model.filteredBy
 import com.lordyhas.muzik.data.model.groupIntoAlbums
+import com.lordyhas.muzik.data.model.mergeEditedOrder
 import com.lordyhas.muzik.data.model.indexLetter
 import com.lordyhas.muzik.data.repository.parseLyrics
 import org.junit.Assert.assertEquals
@@ -164,5 +165,26 @@ class LibraryLogicTest {
         assertEquals(listOf(2L, 4L), kept.map { it.id })
         val recording = song(5, "A", albumId = 1, isRecording = true)
         assertEquals(listOf(5L), listOf(recording).filteredBy(LibraryFilter(hideRecordings = false)).map { it.id })
+    }
+
+    @Test
+    fun `playlist edit applies new order and drops removed songs`() {
+        val order = mergeEditedOrder(
+            allIds = listOf(1L, 2L, 3L, 4L),
+            shownIds = setOf(1L, 2L, 3L, 4L),
+            keptIds = listOf(4L, 1L, 3L) // 2 removed, 4 moved to the top
+        )
+        assertEquals(listOf(4L, 1L, 3L), order)
+    }
+
+    @Test
+    fun `songs not shown in the editor keep their slots`() {
+        // Song 3 is missing from the device (or in a hidden folder), so the editor never showed it
+        val order = mergeEditedOrder(
+            allIds = listOf(1L, 2L, 3L, 4L, 5L),
+            shownIds = setOf(1L, 2L, 4L, 5L),
+            keptIds = listOf(5L, 1L) // 2 and 4 removed, 5 moved first
+        )
+        assertEquals(listOf(5L, 1L, 3L), order)
     }
 }

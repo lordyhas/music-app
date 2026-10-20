@@ -1,5 +1,9 @@
 package com.lordyhas.muzik.ui.components
 
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -21,6 +25,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.lordyhas.muzik.ui.theme.TextMuted
@@ -32,7 +37,14 @@ class ReorderState {
         internal set
     var dragOffset by mutableFloatStateOf(0f)
         internal set
+    /** Row just dropped: it is already where it belongs, so lists skip its placement animation. */
+    var droppedKey by mutableStateOf<Any?>(null)
+        internal set
 }
+
+/** Placement animation for reorderable rows, off for the row that was just dropped. */
+fun ReorderState.placementSpec(key: Any): FiniteAnimationSpec<IntOffset>? =
+    if (droppedKey == key) null else spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset.VisibilityThreshold)
 
 @Composable
 fun rememberReorderState(): ReorderState = remember { ReorderState() }
@@ -59,6 +71,7 @@ fun ReorderableRow(
     val handleModifier = Modifier.pointerInput(key) {
         detectDragGestures(
             onDragStart = {
+                state.droppedKey = null
                 state.draggingKey = key
                 state.dragOffset = 0f
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -69,6 +82,7 @@ fun ReorderableRow(
             },
             onDragEnd = {
                 val steps = (state.dragOffset / rowHeightPx).roundToInt()
+                state.droppedKey = key
                 state.draggingKey = null
                 state.dragOffset = 0f
                 if (steps != 0) currentOnMove(steps)

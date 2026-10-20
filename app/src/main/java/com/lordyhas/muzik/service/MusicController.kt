@@ -250,6 +250,23 @@ class MusicController(private val context: Context) {
         }
     }
 
+    /**
+     * Puts [song] back at [index] (the undo of [removeQueueItem]). [inUserQueue] restores its place
+     * in "Next in queue" rather than in the album/playlist part.
+     */
+    fun insertQueueItem(index: Int, song: Song, inUserQueue: Boolean) {
+        val controller = mediaController ?: return
+        val target = index.coerceIn(0, controller.mediaItemCount)
+        controller.addMediaItem(target, song.toMediaItem())
+        val updatedQueue = _currentQueue.value.toMutableList()
+        updatedQueue.add(target.coerceAtMost(updatedQueue.size), song)
+        _currentQueue.value = updatedQueue
+        if (inUserQueue) _userQueueCount.value++
+        clampUserQueueCount()
+        updateUIQueues()
+        persist()
+    }
+
     fun playQueueIndex(index: Int) {
         val controller = mediaController ?: return
         if (index in 0 until controller.mediaItemCount) {
